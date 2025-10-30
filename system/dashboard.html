@@ -290,6 +290,26 @@
     .widget-toggle input {
       cursor: pointer;
     }
+    .period-btn {
+      transition: all 0.3s ease;
+      border: 2px solid transparent;
+    }
+    .period-btn.active {
+      border-color: white;
+      transform: scale(1.05);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    }
+    .period-btn:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 6px 16px rgba(0, 0, 0, 0.15);
+    }
+    .financial-chart-btn {
+      transition: all 0.3s ease;
+    }
+    .financial-chart-btn.active {
+      transform: scale(1.05);
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+    }
     .hidden-widget {
       display: none !important;
     }
@@ -465,8 +485,12 @@
       </div>
       <h2 class="text-2xl font-bold text-gray-800 mb-2">Dashboard do Provedor</h2>
       <p class="text-gray-600">Acompanhe suas métricas e indicadores em tempo real</p>
+      <p id="last-refresh-time" class="text-gray-500 text-xs mt-1">Carregando dados...</p>
       <div class="mt-4 flex justify-center gap-3">
         <button id="btn-refresh-dashboard" class="btn-filter bg-blue-600 text-white p-2 rounded-lg hover:bg-blue-700"><i class="fas fa-rotate"></i> Atualizar Dados</button>
+        <button id="btn-auto-refresh" class="btn-filter bg-green-600 text-white p-2 rounded-lg hover:bg-green-700" onclick="toggleAutoRefresh()">
+          <i class="fas fa-sync-alt"></i> <span id="auto-refresh-text">Auto-Refresh: OFF</span>
+        </button>
         <button id="btn-customize-dashboard" class="btn-filter bg-purple-600 text-white p-2 rounded-lg hover:bg-purple-700"><i class="fas fa-sliders-h"></i> Personalizar</button>
         <a href="/system/rede.html" class="btn-primary text-white p-2 rounded-lg hover:bg-indigo-700"><i class="fas fa-network-wired"></i> Página de Rede</a>
       </div>
@@ -551,6 +575,60 @@
       </div>
     </div>
 
+    <!-- Widget Financeiro -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+      <div class="card p-6">
+        <div class="flex items-center justify-between">
+          <div>
+            <h3 class="text-lg font-semibold text-gray-800">Receita Total</h3>
+            <p id="totalRevenue" class="text-3xl font-bold text-green-600">R$ 0,00</p>
+            <p class="text-sm text-gray-500 mt-1">Faturamento bruto</p>
+          </div>
+          <div class="bg-gradient-to-br from-green-500/10 to-emerald-500/10 p-4 rounded-full">
+            <i class="fas fa-dollar-sign text-green-600 text-4xl"></i>
+          </div>
+        </div>
+      </div>
+      
+      <div class="card p-6">
+        <div class="flex items-center justify-between">
+          <div>
+            <h3 class="text-lg font-semibold text-gray-800">Receita Mensal</h3>
+            <p id="monthlyRevenue" class="text-3xl font-bold text-blue-600">R$ 0,00</p>
+            <p class="text-sm text-gray-500 mt-1">Mês corrente</p>
+          </div>
+          <div class="bg-gradient-to-br from-blue-500/10 to-cyan-500/10 p-4 rounded-full">
+            <i class="fas fa-calendar-alt text-blue-600 text-4xl"></i>
+          </div>
+        </div>
+      </div>
+      
+      <div class="card p-6">
+        <div class="flex items-center justify-between">
+          <div>
+            <h3 class="text-lg font-semibold text-gray-800">Ticket Médio</h3>
+            <p id="averageTicket" class="text-3xl font-bold text-purple-600">R$ 0,00</p>
+            <p class="text-sm text-gray-500 mt-1">Por cliente</p>
+          </div>
+          <div class="bg-gradient-to-br from-purple-500/10 to-pink-500/10 p-4 rounded-full">
+            <i class="fas fa-chart-line text-purple-600 text-4xl"></i>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Gráfico de Performance Financeira -->
+    <div class="card p-6 mb-6">
+      <div class="flex justify-between items-center mb-4">
+        <h3 class="text-lg font-semibold text-gray-800">Performance Financeira</h3>
+        <div class="flex gap-2">
+          <button onclick="toggleFinancialChart('revenue')" id="btn-revenue" class="financial-chart-btn active px-3 py-1 text-sm rounded bg-blue-600 text-white">Receita</button>
+          <button onclick="toggleFinancialChart('growth')" id="btn-growth" class="financial-chart-btn px-3 py-1 text-sm rounded bg-gray-400 text-white">Crescimento</button>
+        </div>
+      </div>
+      <canvas id="financialChart" height="200"></canvas>
+    </div>
+
     <!-- Painel de Personalização (Inicialmente Oculto) -->
     <div id="customizePanel" class="customize-panel hidden">
       <h2 class="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
@@ -597,6 +675,25 @@
             <input type="checkbox" class="widget-visibility" data-widget="table" checked>
             <span>Tabela</span>
           </label>
+        </div>
+      </div>
+
+      <!-- Filtros de Período -->
+      <div class="mb-6">
+        <h3 class="text-lg font-semibold text-gray-800 mb-3">Filtros de Período</h3>
+        <p class="text-sm text-gray-600 mb-3">Selecione o período para análise dos dados:</p>
+        <div class="grid grid-cols-2 gap-3">
+          <button onclick="setPeriodFilter('7')" id="period-7" class="period-btn bg-blue-600 text-white px-3 py-2 rounded text-sm hover:bg-blue-700">7 Dias</button>
+          <button onclick="setPeriodFilter('30')" id="period-30" class="period-btn bg-blue-600 text-white px-3 py-2 rounded text-sm hover:bg-blue-700 active">30 Dias</button>
+          <button onclick="setPeriodFilter('90')" id="period-90" class="period-btn bg-blue-600 text-white px-3 py-2 rounded text-sm hover:bg-blue-700">3 Meses</button>
+          <button onclick="setPeriodFilter('365')" id="period-365" class="period-btn bg-blue-600 text-white px-3 py-2 rounded text-sm hover:bg-blue-700">1 Ano</button>
+        </div>
+        <div class="mt-3">
+          <label class="block text-sm text-gray-600 mb-1">Período personalizado:</label>
+          <div class="grid grid-cols-2 gap-2">
+            <input type="date" id="custom-start" class="text-sm border rounded px-2 py-1" onchange="updateCustomPeriod()">
+            <input type="date" id="custom-end" class="text-sm border rounded px-2 py-1" onchange="updateCustomPeriod()">
+          </div>
         </div>
       </div>
 
@@ -720,6 +817,13 @@
 
   <script>
     let charts = {};
+    let autoRefreshInterval = null;
+    let isAutoRefreshEnabled = false;
+    let refreshCounter = 30; // Contador regressivo
+    let lastUpdateTime = null;
+    let previousData = null; // Para comparar mudanças
+    let currentPeriod = '30'; // Período padrão: 30 dias
+    let customDateRange = null;
 
     async function checkAuth() {
       try {
@@ -805,7 +909,8 @@
 
     async function loadDashboard() {
       try {
-        const response = await fetch('/system/api/dashboard.php');
+        const periodParams = getPeriodParams();
+        const response = await fetch(`/system/api/dashboard.php?${periodParams.substring(1)}`);
         if (!response.ok) {
           const errorText = await response.text();
           throw new Error(`Erro HTTP ${response.status}: ${errorText || response.statusText}`);
@@ -928,11 +1033,301 @@
         // Tabela de Vencimentos Próximos
         renderDueTable(data.upcomingDue || []);
         
+        // Atualizar métricas financeiras
+        updateFinancialMetrics(data);
+        
+        // Atualizar gráfico financeiro
+        updateFinancialChart();
+        
+        // Verificar mudanças para notificações
+        checkForChanges(data);
+        
+        // Atualizar timestamp da última atualização
+        lastUpdateTime = new Date();
+        updateLastRefreshTime();
+        
         // Disparar evento para inicializar mapa
         window.dispatchEvent(new Event('dashboardLoaded'));
       } catch (error) {
         showModal('Erro', `Erro ao carregar dashboard: ${error.message}`, 'fas fa-exclamation-triangle text-red-600');
       }
+    }
+
+    // ===== SISTEMA DE AUTO-REFRESH =====
+    function toggleAutoRefresh() {
+      isAutoRefreshEnabled = !isAutoRefreshEnabled;
+      const button = document.getElementById('btn-auto-refresh');
+      const text = document.getElementById('auto-refresh-text');
+      
+      if (isAutoRefreshEnabled) {
+        button.classList.remove('bg-green-600');
+        button.classList.add('bg-red-600', 'animate-pulse');
+        text.textContent = 'Auto-Refresh: ON (30s)';
+        startAutoRefresh();
+        showToast('Auto-Refresh Ativado', 'Dashboard será atualizado a cada 30 segundos', 'success', 3000);
+      } else {
+        button.classList.remove('bg-red-600', 'animate-pulse');
+        button.classList.add('bg-green-600');
+        text.textContent = 'Auto-Refresh: OFF';
+        stopAutoRefresh();
+        showToast('Auto-Refresh Desativado', 'Atualizações automáticas foram pausadas', 'info', 2000);
+      }
+      
+      // Salvar preferência
+      localStorage.setItem('autoRefreshEnabled', isAutoRefreshEnabled);
+    }
+
+    function startAutoRefresh() {
+      if (autoRefreshInterval) clearInterval(autoRefreshInterval);
+      
+      refreshCounter = 30;
+      autoRefreshInterval = setInterval(() => {
+        refreshCounter--;
+        updateCountdown();
+        
+        if (refreshCounter <= 0) {
+          loadDashboard();
+          refreshCounter = 30;
+        }
+      }, 1000);
+    }
+
+    function stopAutoRefresh() {
+      if (autoRefreshInterval) {
+        clearInterval(autoRefreshInterval);
+        autoRefreshInterval = null;
+      }
+      document.getElementById('auto-refresh-text').textContent = 'Auto-Refresh: OFF';
+    }
+
+    function updateCountdown() {
+      if (isAutoRefreshEnabled) {
+        const text = document.getElementById('auto-refresh-text');
+        text.textContent = `Auto-Refresh: ON (${refreshCounter}s)`;
+      }
+    }
+
+    function updateLastRefreshTime() {
+      const lastRefreshEl = document.getElementById('last-refresh-time');
+      if (lastRefreshEl && lastUpdateTime) {
+        const timeString = lastUpdateTime.toLocaleTimeString('pt-BR');
+        lastRefreshEl.textContent = `Última atualização: ${timeString}`;
+      }
+    }
+
+    // ===== SISTEMA DE NOTIFICAÇÕES =====
+    function checkForChanges(newData) {
+      if (!previousData) {
+        previousData = newData;
+        return;
+      }
+      
+      // Verificar novos clientes
+      if (newData.totalClients > previousData.totalClients) {
+        const diff = newData.totalClients - previousData.totalClients;
+        showNotification('Novos Clientes!', `${diff} novo(s) cliente(s) cadastrado(s)`, 'success');
+      }
+      
+      // Verificar novos vencimentos
+      if (newData.dueToday > previousData.dueToday) {
+        const diff = newData.dueToday - previousData.dueToday;
+        showNotification('Atenção!', `${diff} novo(s) vencimento(s) hoje`, 'warning');
+      }
+      
+      // Verificar novos inadimplentes
+      if (newData.overdueClients > previousData.overdueClients) {
+        const diff = newData.overdueClients - previousData.overdueClients;
+        showNotification('Alerta!', `${diff} novo(s) cliente(s) inadimplente(s)`, 'error');
+      }
+      
+      previousData = newData;
+    }
+
+    function showNotification(title, message, type) {
+      // Verificar se o navegador suporta notificações
+      if ("Notification" in window && Notification.permission === "granted") {
+        new Notification(title, {
+          body: message,
+          icon: '/system/favicon.ico'
+        });
+      }
+      
+      // Sempre mostrar toast também
+      showToast(title, message, type, 5000);
+    }
+
+    function requestNotificationPermission() {
+      if ("Notification" in window && Notification.permission === "default") {
+        Notification.requestPermission().then(function(permission) {
+          if (permission === "granted") {
+            showToast('Notificações Ativadas', 'Você receberá notificações sobre mudanças importantes', 'success', 3000);
+          }
+        });
+      }
+    }
+
+    // ===== FILTROS DE PERÍODO =====
+    function setPeriodFilter(days) {
+      currentPeriod = days;
+      customDateRange = null;
+      
+      // Atualizar aparência dos botões
+      document.querySelectorAll('.period-btn').forEach(btn => {
+        btn.classList.remove('active', 'bg-green-600');
+        btn.classList.add('bg-blue-600');
+      });
+      
+      const activeBtn = document.getElementById(`period-${days}`);
+      if (activeBtn) {
+        activeBtn.classList.remove('bg-blue-600');
+        activeBtn.classList.add('bg-green-600', 'active');
+      }
+      
+      // Limpar datas customizadas
+      document.getElementById('custom-start').value = '';
+      document.getElementById('custom-end').value = '';
+      
+      // Recarregar dashboard com novo período
+      loadDashboard();
+      
+      // Salvar preferência
+      localStorage.setItem('dashboardPeriod', days);
+      
+      showToast('Filtro Aplicado', `Exibindo dados dos últimos ${days} dias`, 'info', 2000);
+    }
+
+    function updateCustomPeriod() {
+      const startDate = document.getElementById('custom-start').value;
+      const endDate = document.getElementById('custom-end').value;
+      
+      if (startDate && endDate) {
+        customDateRange = { start: startDate, end: endDate };
+        currentPeriod = 'custom';
+        
+        // Desativar botões de período
+        document.querySelectorAll('.period-btn').forEach(btn => {
+          btn.classList.remove('active', 'bg-green-600');
+          btn.classList.add('bg-blue-600');
+        });
+        
+        // Recarregar dashboard
+        loadDashboard();
+        
+        const start = new Date(startDate).toLocaleDateString('pt-BR');
+        const end = new Date(endDate).toLocaleDateString('pt-BR');
+        showToast('Período Personalizado', `Exibindo dados de ${start} até ${end}`, 'info', 3000);
+      }
+    }
+
+    function getPeriodParams() {
+      if (customDateRange) {
+        return `&start_date=${customDateRange.start}&end_date=${customDateRange.end}`;
+      } else {
+        return `&period=${currentPeriod}`;
+      }
+    }
+
+    // ===== WIDGET FINANCEIRO =====
+    let financialChartMode = 'revenue';
+    
+    function toggleFinancialChart(mode) {
+      financialChartMode = mode;
+      
+      // Atualizar botões
+      document.querySelectorAll('.financial-chart-btn').forEach(btn => {
+        btn.classList.remove('active', 'bg-blue-600');
+        btn.classList.add('bg-gray-400');
+      });
+      
+      const activeBtn = document.getElementById(`btn-${mode}`);
+      if (activeBtn) {
+        activeBtn.classList.remove('bg-gray-400');
+        activeBtn.classList.add('bg-blue-600', 'active');
+      }
+      
+      // Recriar gráfico
+      updateFinancialChart();
+    }
+
+    function updateFinancialChart() {
+      if (charts.financial) charts.financial.destroy();
+      
+      const ctx = document.getElementById('financialChart').getContext('2d');
+      
+      // Dados simulados (você pode integrar com API real)
+      const revenueData = {
+        labels: ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun'],
+        datasets: [{
+          label: 'Receita Mensal',
+          data: [45000, 52000, 48000, 58000, 55000, 62000],
+          borderColor: '#10b981',
+          backgroundColor: 'rgba(16, 185, 129, 0.1)',
+          fill: true,
+          tension: 0.4
+        }]
+      };
+      
+      const growthData = {
+        labels: ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun'],
+        datasets: [{
+          label: 'Crescimento (%)',
+          data: [5, 15, -8, 21, -5, 13],
+          borderColor: '#3b82f6',
+          backgroundColor: 'rgba(59, 130, 246, 0.1)',
+          fill: true,
+          tension: 0.4
+        }]
+      };
+      
+      const chartData = financialChartMode === 'revenue' ? revenueData : growthData;
+      
+      charts.financial = new Chart(ctx, {
+        type: 'line',
+        data: chartData,
+        options: {
+          responsive: true,
+          scales: {
+            y: { 
+              beginAtZero: true,
+              ticks: {
+                callback: function(value) {
+                  if (financialChartMode === 'revenue') {
+                    return 'R$ ' + value.toLocaleString('pt-BR');
+                  } else {
+                    return value + '%';
+                  }
+                }
+              }
+            },
+            x: { grid: { display: false } }
+          },
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              callbacks: {
+                label: function(ctx) {
+                  if (financialChartMode === 'revenue') {
+                    return `Receita: R$ ${ctx.raw.toLocaleString('pt-BR')}`;
+                  } else {
+                    return `Crescimento: ${ctx.raw}%`;
+                  }
+                }
+              }
+            }
+          }
+        }
+      });
+    }
+
+    function updateFinancialMetrics(data) {
+      // Calcular métricas financeiras (valores simulados)
+      const totalRevenue = (data.activeClients || 0) * 89.90; // Assumindo R$ 89,90 por cliente
+      const monthlyRevenue = totalRevenue * 0.8; // 80% do total para o mês atual
+      const averageTicket = data.totalClients > 0 ? totalRevenue / data.totalClients : 0;
+      
+      document.getElementById('totalRevenue').textContent = `R$ ${totalRevenue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
+      document.getElementById('monthlyRevenue').textContent = `R$ ${monthlyRevenue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
+      document.getElementById('averageTicket').textContent = `R$ ${averageTicket.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
     }
 
     async function sendWhatsAppReminder(phoneNumber, clientName, dueDay, planName) {
@@ -1041,7 +1436,44 @@
     window.onload = function() {
       checkAuth();
       initMobileMenu();
+      initializeDashboard();
     };
+
+    function initializeDashboard() {
+      // Carregar configurações salvas
+      const autoRefreshSaved = localStorage.getItem('autoRefreshEnabled') === 'true';
+      if (autoRefreshSaved) {
+        isAutoRefreshEnabled = true;
+        const button = document.getElementById('btn-auto-refresh');
+        const text = document.getElementById('auto-refresh-text');
+        button.classList.remove('bg-green-600');
+        button.classList.add('bg-red-600', 'animate-pulse');
+        text.textContent = 'Auto-Refresh: ON (30s)';
+        startAutoRefresh();
+      }
+      
+      // Carregar período salvo
+      const savedPeriod = localStorage.getItem('dashboardPeriod') || '30';
+      currentPeriod = savedPeriod;
+      
+      // Atualizar botão ativo
+      document.querySelectorAll('.period-btn').forEach(btn => {
+        btn.classList.remove('active', 'bg-green-600');
+        btn.classList.add('bg-blue-600');
+      });
+      
+      const activeBtn = document.getElementById(`period-${savedPeriod}`);
+      if (activeBtn) {
+        activeBtn.classList.remove('bg-blue-600');
+        activeBtn.classList.add('bg-green-600', 'active');
+      }
+      
+      // Solicitar permissão para notificações
+      requestNotificationPermission();
+      
+      // Carregar dashboard pela primeira vez
+      loadDashboard();
+    }
 
     // Refresh button and event listeners
     document.addEventListener('DOMContentLoaded', () => {
@@ -1364,6 +1796,151 @@
       console.log('DOMContentLoaded disparado');
       // O loadDashboard deve disparar dashboardLoaded
     });
+  </script>
+
+  <!-- Toast Container -->
+  <div id="toast-container" class="fixed top-4 right-4 z-50 space-y-2"></div>
+
+  <!-- Notification Center -->
+  <div id="notification-center" class="fixed top-20 right-4 w-80 bg-white rounded-lg shadow-xl border border-gray-200 z-40 hidden">
+    <div class="p-4 border-b border-gray-200">
+      <div class="flex justify-between items-center">
+        <h3 class="font-semibold text-gray-800">Centro de Notificações</h3>
+        <div class="flex gap-2">
+          <button onclick="clearAllNotifications()" class="text-xs text-red-600 hover:text-red-800">Limpar</button>
+          <button onclick="toggleNotificationCenter()" class="text-gray-500 hover:text-gray-700">
+            <i class="fas fa-times"></i>
+          </button>
+        </div>
+      </div>
+    </div>
+    <div id="notification-list" class="max-h-96 overflow-y-auto">
+      <div class="p-4 text-center text-gray-500 text-sm">
+        Nenhuma notificação ainda
+      </div>
+    </div>
+  </div>
+
+  <!-- Notification Bell Button -->
+  <button id="notification-bell" onclick="toggleNotificationCenter()" 
+          class="fixed top-24 right-4 bg-blue-600 text-white p-3 rounded-full shadow-lg hover:bg-blue-700 z-30 transition-all">
+    <i class="fas fa-bell"></i>
+    <span id="notification-badge" class="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center hidden">0</span>
+  </button>
+
+  <script>
+    // ===== FUNÇÕES DE NOTIFICAÇÃO =====
+    let notificationHistory = [];
+    let isNotificationCenterOpen = false;
+
+    function toggleNotificationCenter() {
+      const center = document.getElementById('notification-center');
+      isNotificationCenterOpen = !isNotificationCenterOpen;
+      
+      if (isNotificationCenterOpen) {
+        center.classList.remove('hidden');
+        // Marcar notificações como lidas
+        updateNotificationBadge(0);
+      } else {
+        center.classList.add('hidden');
+      }
+    }
+
+    function addToNotificationHistory(title, message, type, timestamp = new Date()) {
+      const notification = { title, message, type, timestamp, id: Date.now() };
+      notificationHistory.unshift(notification);
+      
+      // Limitar a 50 notificações
+      if (notificationHistory.length > 50) {
+        notificationHistory = notificationHistory.slice(0, 50);
+      }
+      
+      renderNotificationHistory();
+      updateNotificationBadge(getUnreadCount());
+    }
+
+    function renderNotificationHistory() {
+      const container = document.getElementById('notification-list');
+      
+      if (notificationHistory.length === 0) {
+        container.innerHTML = `
+          <div class="p-4 text-center text-gray-500 text-sm">
+            Nenhuma notificação ainda
+          </div>
+        `;
+        return;
+      }
+      
+      container.innerHTML = notificationHistory.map(notif => {
+        const typeColors = {
+          success: 'border-green-500 bg-green-50',
+          warning: 'border-yellow-500 bg-yellow-50',
+          error: 'border-red-500 bg-red-50',
+          info: 'border-blue-500 bg-blue-50'
+        };
+        
+        const typeIcons = {
+          success: 'fas fa-check-circle text-green-600',
+          warning: 'fas fa-exclamation-triangle text-yellow-600',
+          error: 'fas fa-times-circle text-red-600',
+          info: 'fas fa-info-circle text-blue-600'
+        };
+        
+        return `
+          <div class="p-3 border-l-4 ${typeColors[notif.type] || typeColors.info} m-2 rounded">
+            <div class="flex items-start gap-2">
+              <i class="${typeIcons[notif.type] || typeIcons.info}"></i>
+              <div class="flex-1">
+                <h4 class="font-medium text-gray-800 text-sm">${notif.title}</h4>
+                <p class="text-gray-600 text-xs">${notif.message}</p>
+                <p class="text-gray-400 text-xs mt-1">${notif.timestamp.toLocaleTimeString('pt-BR')}</p>
+              </div>
+              <button onclick="removeNotification(${notif.id})" class="text-gray-400 hover:text-red-600">
+                <i class="fas fa-times text-xs"></i>
+              </button>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function clearAllNotifications() {
+      notificationHistory = [];
+      renderNotificationHistory();
+      updateNotificationBadge(0);
+    }
+
+    function removeNotification(id) {
+      notificationHistory = notificationHistory.filter(n => n.id !== id);
+      renderNotificationHistory();
+      updateNotificationBadge(getUnreadCount());
+    }
+
+    function getUnreadCount() {
+      // Para simplicidade, considerar todas as notificações como não lidas
+      // até o centro ser aberto
+      return isNotificationCenterOpen ? 0 : notificationHistory.length;
+    }
+
+    function updateNotificationBadge(count) {
+      const badge = document.getElementById('notification-badge');
+      if (count > 0) {
+        badge.textContent = count > 99 ? '99+' : count;
+        badge.classList.remove('hidden');
+      } else {
+        badge.classList.add('hidden');
+      }
+    }
+
+    // Sobrescrever função showNotification para adicionar ao histórico
+    const originalShowNotification = showNotification;
+    showNotification = function(title, message, type) {
+      // Chamar função original
+      originalShowNotification(title, message, type);
+      
+      // Adicionar ao histórico
+      addToNotificationHistory(title, message, type);
+    };
   </script>
 </body>
 </html>
