@@ -12,7 +12,10 @@ const SYNC_TAG = 'barcode-sync';
 const STATIC_ASSETS = [
   '/system/barcode.html',
   '/system/api/installers.php',
+  '/system/api/stock.php?action=get_all_items',
   'https://cdn.tailwindcss.com',
+  'https://cdn.jsdelivr.net/npm/quagga@0.12.1/dist/quagga.min.js',
+  'https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js',
   'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css',
   'https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap'
 ];

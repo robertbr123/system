@@ -337,15 +337,20 @@
       bottom: 20px;
       left: 20px;
       padding: 12px 16px;
-      border-radius: 8px;
-      background: #ef4444;
+      border-radius: 12px;
+      background: linear-gradient(135deg, #ef4444, #dc2626);
       color: white;
       font-weight: 600;
       display: flex;
-      align-items: center;
-      gap: 8px;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 4px;
       animation: slideInUp 0.3s ease-out;
       z-index: 999;
+      box-shadow: 0 4px 20px rgba(239, 68, 68, 0.4);
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      min-width: 200px;
     }
     .offline-indicator.hidden {
       display: none;
@@ -353,6 +358,12 @@
     .offline-indicator i {
       font-size: 1.2rem;
       animation: pulse-icon 1s ease-in-out infinite;
+    }
+    .offline-indicator #cache-stats {
+      opacity: 0.8;
+      font-size: 0.7rem;
+      font-weight: 400;
+      color: rgba(255, 255, 255, 0.9);
     }
     @keyframes slideInUp {
       from {
@@ -630,6 +641,7 @@
   <div id="offline-indicator" class="offline-indicator hidden">
     <i class="fas fa-wifi-slash"></i>
     <span>Modo Offline</span>
+    <div id="cache-stats" class="text-xs mt-1">Cache carregando...</div>
   </div>
 
   <!-- Sync Status -->
@@ -682,38 +694,183 @@
     // ============ OFFLINE & SYNC ============
     let isOffline = false;
     let pendingMoves = [];
+    let cachedItems = new Map();
+    let cachedInstallers = [];
     const dbName = 'barcodeDB';
     const storeName = 'pendingMoves';
+    const itemsStoreName = 'cachedItems';
+    const installersStoreName = 'cachedInstallers';
 
     // Detectar status online/offline
     window.addEventListener('online', () => {
       isOffline = false;
       document.getElementById('offline-indicator').classList.add('hidden');
       showToast('Conectado', 'Conexão restaurada', 'success', 2000);
+      
+      // Tentar recarregar dados mais recentes
+      loadFilters();
+      preloadItemsCache();
       syncOfflineQueue();
     });
 
     window.addEventListener('offline', () => {
       isOffline = true;
       document.getElementById('offline-indicator').classList.remove('hidden');
-      showToast('Desconectado', 'Você está no modo offline', 'warning', 3000);
+      showToast('Desconectado', 'Modo offline ativado - dados em cache serão usados', 'warning', 4000);
+      updateCacheStats();
     });
 
     // Abrir IndexedDB
     function openDB() {
       return new Promise((resolve, reject) => {
-        const request = indexedDB.open(dbName, 1);
+        const request = indexedDB.open(dbName, 2);
         
         request.onerror = () => reject(request.error);
         request.onsuccess = () => resolve(request.result);
         
         request.onupgradeneeded = (event) => {
           const db = event.target.result;
+          
+          // Store para movimentações pendentes
           if (!db.objectStoreNames.contains(storeName)) {
             db.createObjectStore(storeName, { keyPath: 'id', autoIncrement: true });
           }
+          
+          // Store para cache de itens
+          if (!db.objectStoreNames.contains(itemsStoreName)) {
+            const itemsStore = db.createObjectStore(itemsStoreName, { keyPath: 'barcode' });
+            itemsStore.createIndex('name', 'name', { unique: false });
+          }
+          
+          // Store para cache de instaladores
+          if (!db.objectStoreNames.contains(installersStoreName)) {
+            db.createObjectStore(installersStoreName, { keyPath: 'id' });
+          }
         };
       });
+    }
+
+    // Cache de itens para uso offline
+    async function preloadItemsCache() {
+      try {
+        const response = await fetch('/system/api/stock.php?action=get_all_items');
+        if (response.ok) {
+          const items = await response.json();
+          const db = await openDB();
+          const tx = db.transaction(itemsStoreName, 'readwrite');
+          const store = tx.objectStore(itemsStoreName);
+          
+          // Limpar cache antigo
+          store.clear();
+          
+          // Adicionar novos itens
+          for (const item of items) {
+            store.put({
+              ...item,
+              cached_at: new Date().toISOString()
+            });
+            cachedItems.set(item.barcode, item);
+          }
+          
+          console.log(`[CACHE] ${items.length} itens salvos no cache`);
+          showToast('Cache Atualizado', `${items.length} equipamentos em cache`, 'info', 2000);
+        }
+      } catch (error) {
+        console.log('[CACHE] Erro ao carregar itens para cache:', error);
+      }
+    }
+
+    // Cache de instaladores para uso offline
+    async function cacheInstallers(installers) {
+      try {
+        const db = await openDB();
+        const tx = db.transaction(installersStoreName, 'readwrite');
+        const store = tx.objectStore(installersStoreName);
+        
+        // Limpar cache antigo
+        store.clear();
+        
+        // Adicionar novos instaladores
+        for (const installer of installers) {
+          store.put({
+            ...installer,
+            cached_at: new Date().toISOString()
+          });
+        }
+        
+        cachedInstallers = installers;
+        console.log(`[CACHE] ${installers.length} instaladores salvos no cache`);
+      } catch (error) {
+        console.log('[CACHE] Erro ao cachear instaladores:', error);
+      }
+    }
+
+    // Buscar item por código de barras (online/offline)
+    async function getItemByBarcode(barcode) {
+      try {
+        if (!isOffline) {
+          // Tentar online primeiro
+          const response = await fetch(`/system/api/stock.php?action=get_item_by_barcode&barcode=${encodeURIComponent(barcode)}`);
+          if (response.ok) {
+            const item = await response.json();
+            // Atualizar cache local
+            cachedItems.set(barcode, item);
+            return item;
+          }
+        }
+        
+        // Fallback para cache
+        if (cachedItems.has(barcode)) {
+          showToast('Cache', 'Usando dados offline', 'info', 1500);
+          return cachedItems.get(barcode);
+        }
+        
+        // Buscar no IndexedDB
+        const db = await openDB();
+        const tx = db.transaction(itemsStoreName, 'readonly');
+        const store = tx.objectStore(itemsStoreName);
+        
+        return new Promise((resolve, reject) => {
+          const request = store.get(barcode);
+          request.onsuccess = () => {
+            if (request.result) {
+              showToast('Cache', 'Equipamento encontrado offline', 'info', 2000);
+              resolve(request.result);
+            } else {
+              reject(new Error('Equipamento não encontrado no cache offline'));
+            }
+          };
+          request.onerror = () => reject(request.error);
+        });
+        
+      } catch (error) {
+        throw new Error(`Equipamento não encontrado: ${error.message}`);
+      }
+    }
+
+    // Carregar instaladores do cache se offline
+    async function loadInstallersFromCache() {
+      try {
+        const db = await openDB();
+        const tx = db.transaction(installersStoreName, 'readonly');
+        const store = tx.objectStore(installersStoreName);
+        
+        return new Promise((resolve, reject) => {
+          const request = store.getAll();
+          request.onsuccess = () => {
+            const installers = request.result;
+            if (installers.length > 0) {
+              showToast('Cache', `${installers.length} instaladores carregados offline`, 'info', 2000);
+              resolve(installers);
+            } else {
+              reject(new Error('Nenhum instalador em cache'));
+            }
+          };
+          request.onerror = () => reject(request.error);
+        });
+      } catch (error) {
+        throw error;
+      }
     }
 
     // Salvar movimentação offline
@@ -732,6 +889,7 @@
           request.onsuccess = () => {
             pendingMoves.push(moveData);
             showToast('Armazenado Offline', 'Será sincronizado quando conectado', 'info', 2000);
+            updateCacheStats(); // Atualizar estatísticas
             resolve(request.result);
           };
           request.onerror = () => reject(request.error);
@@ -797,6 +955,7 @@
               showToast('Aviso', `${failed} movimentação(ões) falharam`, 'warning', 3000);
             }
             
+            updateCacheStats(); // Atualizar estatísticas após sincronização
             resolve();
           };
           request.onerror = () => reject(request.error);
@@ -891,18 +1050,45 @@
 
     async function loadFilters() {
       try {
-        const response = await fetch('/system/api/installers.php');
-        if (!response.ok) throw new Error(`Erro ao carregar instaladores: ${response.statusText}`);
-        const installers = await response.json();
+        let installers = [];
+        
+        if (!isOffline) {
+          // Tentar carregar online
+          const response = await fetch('/system/api/installers.php');
+          if (response.ok) {
+            installers = await response.json();
+            // Cachear para uso offline
+            await cacheInstallers(installers);
+          } else {
+            throw new Error(`Erro ao carregar instaladores: ${response.statusText}`);
+          }
+        } else {
+          // Carregar do cache
+          installers = await loadInstallersFromCache();
+        }
+        
         const installerSelect = document.getElementById('scannedInstaller');
+        // Limpar opções existentes (exceto a primeira)
+        installerSelect.innerHTML = '<option value="">Selecione um Instalador</option>';
+        
         installers.forEach(installer => {
           const option = document.createElement('option');
           option.value = installer.name;
           option.textContent = installer.name;
           installerSelect.appendChild(option);
         });
+        
+        if (isOffline) {
+          showToast('Cache', 'Instaladores carregados do cache offline', 'info', 2000);
+        }
+        
       } catch (error) {
-        showModal('Erro', `Erro ao carregar instaladores: ${error.message}`, 'fas fa-exclamation-triangle text-red-600');
+        console.error('Erro ao carregar instaladores:', error);
+        showToast('✗ Erro', `Erro ao carregar instaladores: ${error.message}`, 'error', 3000);
+        
+        if (!isOffline) {
+          showModal('Erro', `Erro ao carregar instaladores: ${error.message}`, 'fas fa-exclamation-triangle text-red-600');
+        }
       }
     }
 
@@ -989,12 +1175,9 @@
 
     async function processCode(code) {
       try {
-        const response = await fetch(`/system/api/stock.php?action=get_item_by_barcode&barcode=${encodeURIComponent(code)}`);
-        if (!response.ok) {
-          const errorText = await response.text();
-          throw new Error(`Erro HTTP ${response.status}: ${errorText || response.statusText}`);
-        }
-        const item = await response.json();
+        // Usar função com cache offline
+        const item = await getItemByBarcode(code);
+        
         if (item.error) {
           throw new Error(item.error);
         }
@@ -1002,6 +1185,9 @@
         document.getElementById('scannedItemBarcode').textContent = item.barcode;
         document.getElementById('scannedItemId').value = item.id;
         document.getElementById('scannedItemInfo').classList.remove('hidden');
+        
+        // Status visual de sucesso
+        const statusMsg = isOffline ? 'Equipamento encontrado (cache offline)' : 'Equipamento encontrado';
         showToast('✓ Equipamento Encontrado', `${item.name} (${item.barcode})`, 'success', 2000);
       } catch (error) {
         showToast('✗ Erro', `Equipamento não encontrado: ${error.message}`, 'error', 3000);
@@ -1141,7 +1327,84 @@
     window.onload = function() {
       loadFilters();
       initMobileMenu();
+      initOfflineCache();
     };
+
+    // Inicializar cache offline
+    async function initOfflineCache() {
+      try {
+        await preloadItemsCache();
+        updateCacheStats();
+      } catch (error) {
+        console.log('[CACHE] Erro ao inicializar cache:', error);
+      }
+    }
+
+    // Atualizar estatísticas de cache
+    async function updateCacheStats() {
+      try {
+        const db = await openDB();
+        
+        // Contar itens em cache
+        const itemsTx = db.transaction(itemsStoreName, 'readonly');
+        const itemsStore = itemsTx.objectStore(itemsStoreName);
+        const itemsCount = await new Promise((resolve, reject) => {
+          const request = itemsStore.count();
+          request.onsuccess = () => resolve(request.result);
+          request.onerror = () => reject(request.error);
+        });
+        
+        // Contar instaladores em cache
+        const installersTx = db.transaction(installersStoreName, 'readonly');
+        const installersStore = installersTx.objectStore(installersStoreName);
+        const installersCount = await new Promise((resolve, reject) => {
+          const request = installersStore.count();
+          request.onsuccess = () => resolve(request.result);
+          request.onerror = () => reject(request.error);
+        });
+        
+        // Contar movimentações pendentes
+        const movesTx = db.transaction(storeName, 'readonly');
+        const movesStore = movesTx.objectStore(storeName);
+        const pendingCount = await new Promise((resolve, reject) => {
+          const request = movesStore.count();
+          request.onsuccess = () => resolve(request.result);
+          request.onerror = () => reject(request.error);
+        });
+        
+        const cacheStatsEl = document.getElementById('cache-stats');
+        if (cacheStatsEl) {
+          cacheStatsEl.textContent = `${itemsCount} itens • ${installersCount} instaladores • ${pendingCount} pendentes`;
+        }
+        
+      } catch (error) {
+        console.log('[CACHE] Erro ao atualizar estatísticas:', error);
+      }
+    }
+
+    // Função para limpar cache manualmente (adicionar botão se necessário)
+    async function clearOfflineCache() {
+      try {
+        const db = await openDB();
+        
+        // Limpar apenas cache, manter movimentações pendentes
+        const itemsTx = db.transaction(itemsStoreName, 'readwrite');
+        itemsTx.objectStore(itemsStoreName).clear();
+        
+        const installersTx = db.transaction(installersStoreName, 'readwrite');
+        installersTx.objectStore(installersStoreName).clear();
+        
+        cachedItems.clear();
+        cachedInstallers = [];
+        
+        showToast('Cache Limpo', 'Cache offline foi limpo com sucesso', 'success', 2000);
+        updateCacheStats();
+        
+      } catch (error) {
+        console.error('[CACHE] Erro ao limpar cache:', error);
+        showToast('Erro', 'Erro ao limpar cache offline', 'error', 2000);
+      }
+    }
 
     function initMobileMenu() {
       const mobileMenuButton = document.getElementById('mobile-menu-button');
