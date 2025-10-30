@@ -308,6 +308,89 @@
       display: block;
       color: #ef4444;
     }
+    .success-message {
+      position: absolute;
+      bottom: -1.5rem;
+      left: 0;
+      color: #10b981;
+      font-size: 0.75rem;
+      font-weight: 500;
+      display: none;
+      z-index: 10;
+    }
+    .success-message.show {
+      display: block;
+      animation: fadeIn 0.3s ease;
+    }
+    .error-message {
+      position: absolute;
+      bottom: -1.5rem;
+      left: 0;
+      color: #ef4444;
+      font-size: 0.75rem;
+      font-weight: 500;
+      display: none;
+      z-index: 10;
+    }
+    .error-message.show {
+      display: block;
+      animation: shake 0.5s ease;
+    }
+    .loading-cep {
+      position: absolute;
+      right: 40px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: #667eea;
+      animation: spin 1s linear infinite;
+    }
+    @keyframes spin {
+      from { transform: translateY(-50%) rotate(0deg); }
+      to { transform: translateY(-50%) rotate(360deg); }
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(-10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes shake {
+      0%, 100% { transform: translateX(0); }
+      25% { transform: translateX(-5px); }
+      75% { transform: translateX(5px); }
+    }
+    .tooltip {
+      position: relative;
+      cursor: help;
+    }
+    .tooltip:hover::after {
+      content: attr(data-tooltip);
+      position: absolute;
+      bottom: 100%;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(0, 0, 0, 0.8);
+      color: white;
+      padding: 0.5rem;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      white-space: nowrap;
+      z-index: 1000;
+    }
+    .keyboard-shortcut {
+      position: fixed;
+      bottom: 1rem;
+      right: 1rem;
+      background: rgba(0, 0, 0, 0.7);
+      color: white;
+      padding: 0.5rem 1rem;
+      border-radius: 8px;
+      font-size: 0.8rem;
+      display: none;
+      z-index: 1000;
+    }
+    .keyboard-shortcut.show {
+      display: block;
+      animation: fadeIn 0.3s ease;
+    }
     .recent-clients {
       background: rgba(255, 255, 255, 0.9);
       border-radius: 12px;
@@ -321,6 +404,59 @@
       display: flex;
       align-items: center;
       gap: 0.5rem;
+    }
+    .recent-client-item {
+      background: rgba(102, 126, 234, 0.05);
+      padding: 0.75rem;
+      border-radius: 8px;
+      margin-bottom: 0.5rem;
+      border-left: 3px solid #667eea;
+      transition: all 0.2s ease;
+      position: relative;
+    }
+    .recent-client-item:hover {
+      background: rgba(102, 126, 234, 0.1);
+      transform: translateX(2px);
+    }
+    .recent-client-name {
+      font-weight: 600;
+      color: #1f2937;
+      font-size: 0.9rem;
+    }
+    .recent-client-info {
+      color: #6b7280;
+      font-size: 0.75rem;
+      margin-top: 0.25rem;
+    }
+    .kbd {
+      background: #e5e7eb;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-family: monospace;
+      font-size: 0.75rem;
+      border: 1px solid #d1d5db;
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+    }
+    .client-quick-action {
+      position: absolute;
+      right: 0.5rem;
+      top: 50%;
+      transform: translateY(-50%);
+      background: transparent;
+      border: none;
+      color: #6b7280;
+      cursor: pointer;
+      padding: 0.25rem;
+      border-radius: 4px;
+      opacity: 0;
+      transition: all 0.2s ease;
+    }
+    .recent-client-item:hover .client-quick-action {
+      opacity: 1;
+    }
+    .client-quick-action:hover {
+      background: rgba(102, 126, 234, 0.1);
+      color: #667eea;
     }
     .recent-clients ul {
       list-style: none;
@@ -530,41 +666,44 @@
     </nav>
   </div>
 
-  <div class="mt-20 max-w-4xl mx-auto p-4 sm:p-6 container">
-    <div class="card p-4 sm:p-6">
-      <!-- Notificação de Rascunho -->
-      <div id="draftNotice" class="draft-notice">
-        <i class="fas fa-history"></i>
-        <span>Rascunho anterior encontrado. Clique para restaurar.</span>
-        <button type="button" onclick="restoreDraft()" style="background: white; color: #f59e0b; border: none; padding: 0.25rem 0.75rem; border-radius: 6px; cursor: pointer; font-weight: 600;">
-          Restaurar
-        </button>
-        <button type="button" onclick="closeDraftNotice()" style="background: none; border: none; color: white; cursor: pointer; margin-left: auto;">
-          <i class="fas fa-times"></i>
-        </button>
-      </div>
+  <div class="mt-20 max-w-7xl mx-auto p-4 sm:p-6 container">
+    <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
+      <!-- Formulário Principal -->
+      <div class="lg:col-span-3">
+        <div class="card p-4 sm:p-6">
+          <!-- Notificação de Rascunho -->
+          <div id="draftNotice" class="draft-notice">
+            <i class="fas fa-history"></i>
+            <span>Rascunho anterior encontrado. Clique para restaurar.</span>
+            <button type="button" onclick="restoreDraft()" style="background: white; color: #f59e0b; border: none; padding: 0.25rem 0.75rem; border-radius: 6px; cursor: pointer; font-weight: 600;">
+              Restaurar
+            </button>
+            <button type="button" onclick="closeDraftNotice()" style="background: none; border: none; color: white; cursor: pointer; margin-left: auto;">
+              <i class="fas fa-times"></i>
+            </button>
+          </div>
 
-      <!-- Barra de Progresso -->
-      <div class="progress-container">
-        <div class="progress-bar">
-          <div id="progressFill" class="progress-fill" style="width: 0%"></div>
-        </div>
-        <div class="progress-text">
-          <i class="fas fa-tasks"></i> Formulário
-          <strong id="fillPercent">0</strong>% completo
-          <span id="requiredInfo" style="margin-left: 1rem; color: #ef4444;">(<span id="requiredCount">0</span> obrigatórios)</span>
-        </div>
-      </div>
+          <!-- Barra de Progresso -->
+          <div class="progress-container">
+            <div class="progress-bar">
+              <div id="progressFill" class="progress-fill" style="width: 0%"></div>
+            </div>
+            <div class="progress-text">
+              <i class="fas fa-tasks"></i> Formulário
+              <strong id="fillPercent">0</strong>% completo
+              <span id="requiredInfo" style="margin-left: 1rem; color: #ef4444;">(<span id="requiredCount">0</span> obrigatórios)</span>
+            </div>
+          </div>
 
-      <div class="mb-8 text-center">
-        <div class="text-5xl mb-4 text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-purple-600">
-          <i class="fas fa-user-plus"></i>
-        </div>
-        <h2 class="text-2xl font-bold text-gray-800 mb-2">Cadastro de Cliente</h2>
-        <p class="text-gray-600">Preencha todos os campos obrigatórios para cadastrar um novo cliente</p>
-      </div>
+          <div class="mb-8 text-center">
+            <div class="text-5xl mb-4 text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-purple-600">
+              <i class="fas fa-user-plus"></i>
+            </div>
+            <h2 class="text-2xl font-bold text-gray-800 mb-2">Cadastro de Cliente</h2>
+            <p class="text-gray-600">Preencha todos os campos obrigatórios para cadastrar um novo cliente</p>
+          </div>
 
-      <form id="clientForm" class="accordion">
+          <form id="clientForm" class="accordion">
         <!-- SEÇÃO 1: DADOS PESSOAIS -->
         <div class="accordion-item">
           <button type="button" class="accordion-header open" onclick="toggleAccordion(this)">
@@ -627,23 +766,36 @@
           </button>
           <div class="accordion-body">
             <div class="input-icon">
-              <input id="address" type="text" placeholder="Endereço" class="p-3 border rounded-lg focus:outline-none bg-gray-50 w-full" />
+              <input id="cep" type="text" placeholder="CEP (opcional)" maxlength="9" class="p-3 border rounded-lg focus:outline-none bg-gray-50 w-full" title="Digite o CEP para preenchimento automático do endereço" />
+              <div id="cep-error" class="error-message">CEP não encontrado</div>
+              <div id="cep-success" class="success-message">Endereço encontrado e preenchido!</div>
+              <i class="fas fa-map-pin"></i>
+              <i class="validation-icon"></i>
+              <div class="error-message" id="cep-error">CEP inválido</div>
+              <div class="success-message" id="cep-success">CEP encontrado! Endereço preenchido automaticamente.</div>
+            </div>
+            <div class="input-icon">
+              <input id="address" type="text" placeholder="Endereço" class="p-3 border rounded-lg focus:outline-none bg-gray-50 w-full" title="Endereço será preenchido automaticamente se você informar o CEP" />
               <i class="fas fa-home"></i>
               <i class="validation-icon"></i>
               <div class="error-message" id="address-error">Endereço é obrigatório</div>
             </div>
             <div class="input-icon">
-              <input id="number" type="text" placeholder="Número" class="p-3 border rounded-lg focus:outline-none bg-gray-50 w-full" />
+              <input id="number" type="text" placeholder="Número" class="p-3 border rounded-lg focus:outline-none bg-gray-50 w-full" title="Número da residência ou estabelecimento" />
               <i class="fas fa-hashtag"></i>
               <i class="validation-icon"></i>
               <div class="error-message" id="number-error">Número inválido</div>
             </div>
             <div class="input-icon">
-              <input id="complement" type="text" placeholder="Complemento" class="p-3 border rounded-lg focus:outline-none bg-gray-50 w-full" />
+              <input id="complement" type="text" placeholder="Complemento" class="p-3 border rounded-lg focus:outline-none bg-gray-50 w-full" title="Ex: Apt 101, Bloco A, etc." />
               <i class="fas fa-info-circle"></i>
             </div>
             <div class="input-icon">
-              <select id="city" class="p-3 border rounded-lg focus:outline-none bg-gray-50 w-full">
+              <input id="neighborhood" type="text" placeholder="Bairro" class="p-3 border rounded-lg focus:outline-none bg-gray-50 w-full" title="Bairro será preenchido automaticamente via CEP" />
+              <i class="fas fa-map"></i>
+            </div>
+            <div class="input-icon">
+              <select id="city" class="p-3 border rounded-lg focus:outline-none bg-gray-50 w-full" title="Selecione ou será preenchido automaticamente via CEP">
                 <option value="">Selecione a Cidade</option>
                 <option value="Ipixuna">Ipixuna</option>
                 <option value="Eirunepé">Eirunepé</option>
@@ -733,6 +885,76 @@
       <div class="recent-clients" id="recentClientsSection" style="display: none;">
         <h4><i class="fas fa-history"></i> Últimos Cadastrados</h4>
         <ul id="recentList"></ul>
+      </div>
+    </div>
+    </div>
+
+    <!-- Sidebar - Clientes Recentes -->
+    <div class="lg:col-span-1">
+      <div class="card p-4 sticky top-24">
+        <!-- Estatísticas do Dia -->
+        <div class="mb-6">
+          <h3 class="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
+            <i class="fas fa-chart-bar text-blue-600"></i> Estatísticas Hoje
+          </h3>
+          <div class="grid grid-cols-1 gap-3">
+            <div class="bg-gradient-to-r from-blue-500 to-blue-600 p-3 rounded-lg text-white text-center">
+              <div class="text-2xl font-bold" id="todayRegistrations">0</div>
+              <div class="text-xs text-blue-100">Cadastros</div>
+            </div>
+            <div class="bg-gradient-to-r from-green-500 to-green-600 p-3 rounded-lg text-white text-center">
+              <div class="text-2xl font-bold" id="weekRegistrations">0</div>
+              <div class="text-xs text-green-100">Esta Semana</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Clientes Recentes -->
+        <div class="mb-6">
+          <h3 class="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
+            <i class="fas fa-clock text-purple-600"></i> Recentes
+          </h3>
+          <div id="recentClientsList" class="space-y-2">
+            <div class="text-center text-gray-500 text-sm py-4">
+              <i class="fas fa-user-plus text-2xl mb-2 block"></i>
+              Nenhum cadastro recente
+            </div>
+          </div>
+          <button onclick="loadRecentClients()" class="w-full mt-3 text-sm text-blue-600 hover:text-blue-800 flex items-center justify-center gap-1">
+            <i class="fas fa-refresh"></i> Atualizar
+          </button>
+        </div>
+
+        <!-- Quick Actions -->
+        <div class="mb-6">
+          <h3 class="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
+            <i class="fas fa-bolt text-yellow-500"></i> Ações Rápidas
+          </h3>
+          <div class="space-y-2">
+            <button onclick="generatePPPoE()" class="w-full p-2 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 flex items-center gap-2 text-sm">
+              <i class="fas fa-magic"></i> Gerar PPPoE
+            </button>
+            <button onclick="duplicateLastClient()" class="w-full p-2 bg-green-100 text-green-700 rounded-lg hover:bg-green-200 flex items-center gap-2 text-sm">
+              <i class="fas fa-copy"></i> Duplicar Último
+            </button>
+            <button onclick="exportFormPDF()" class="w-full p-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 flex items-center gap-2 text-sm">
+              <i class="fas fa-file-pdf"></i> Gerar PDF
+            </button>
+          </div>
+        </div>
+
+        <!-- Ajuda -->
+        <div>
+          <h3 class="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
+            <i class="fas fa-question-circle text-gray-600"></i> Ajuda
+          </h3>
+          <div class="text-sm text-gray-600 space-y-2">
+            <div><kbd class="kbd">Ctrl+S</kbd> Salvar</div>
+            <div><kbd class="kbd">Ctrl+R</kbd> Revisar</div>
+            <div><kbd class="kbd">Ctrl+L</kbd> Limpar</div>
+            <div><kbd class="kbd">Esc</kbd> Fechar Modal</div>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -842,6 +1064,257 @@
       document.getElementById('phone').addEventListener('input', validatePhoneRealtime);
       document.getElementById('birthDate').addEventListener('change', validateBirthDateRealtime);
       document.getElementById('planId').addEventListener('change', showPlanDetails);
+      document.getElementById('cep').addEventListener('input', validateCEPRealtime);
+    }
+
+    // ===== FUNÇÕES DE CEP =====
+    function validateCEPRealtime(e) {
+      const cep = e.target.value.replace(/\D/g, '');
+      
+      // Auto-formatar CEP
+      if (cep.length <= 8) {
+        e.target.value = cep.replace(/(\d{5})(\d)/, '$1-$2');
+      }
+      
+      // Buscar CEP se tiver 8 dígitos
+      if (cep.length === 8) {
+        searchCEP(cep);
+      } else {
+        clearCEPFields();
+      }
+    }
+
+    async function searchCEP(cep) {
+      const cepInput = document.getElementById('cep');
+      const loadingIcon = document.createElement('i');
+      loadingIcon.className = 'fas fa-spinner loading-cep';
+      cepInput.parentElement.appendChild(loadingIcon);
+      
+      try {
+        const response = await fetch(`https://viacep.com.br/ws/${cep}/json/`);
+        const data = await response.json();
+        
+        if (data.erro) {
+          showCEPError('CEP não encontrado');
+        } else {
+          fillAddressFromCEP(data);
+          showCEPSuccess();
+        }
+      } catch (error) {
+        showCEPError('Erro ao buscar CEP');
+      } finally {
+        loadingIcon.remove();
+      }
+    }
+
+    function fillAddressFromCEP(data) {
+      document.getElementById('address').value = data.logradouro || '';
+      document.getElementById('neighborhood').value = data.bairro || '';
+      
+      // Verificar se a cidade está na lista
+      const citySelect = document.getElementById('city');
+      const cities = Array.from(citySelect.options).map(opt => opt.value);
+      if (cities.includes(data.localidade)) {
+        citySelect.value = data.localidade;
+      } else {
+        citySelect.value = '';
+      }
+      
+      // Focar no campo número
+      document.getElementById('number').focus();
+    }
+
+    function clearCEPFields() {
+      const cepError = document.getElementById('cep-error');
+      const cepSuccess = document.getElementById('cep-success');
+      cepError.classList.remove('show');
+      cepSuccess.classList.remove('show');
+    }
+
+    function showCEPError(message) {
+      const cepError = document.getElementById('cep-error');
+      const cepSuccess = document.getElementById('cep-success');
+      cepError.textContent = message;
+      cepError.classList.add('show');
+      cepSuccess.classList.remove('show');
+    }
+
+    function showCEPSuccess() {
+      const cepError = document.getElementById('cep-error');
+      const cepSuccess = document.getElementById('cep-success');
+      cepSuccess.classList.add('show');
+      cepError.classList.remove('show');
+      setTimeout(() => cepSuccess.classList.remove('show'), 3000);
+    }
+
+    // ===== FUNÇÕES DE CLIENTES RECENTES =====
+    async function loadRecentClients() {
+      try {
+        const response = await fetch('/system/api/clients.php?recent=5', {
+          credentials: 'include'
+        });
+        const result = await response.json();
+        
+        if (result.success) {
+          recentClients = result.data || [];
+          renderRecentClients();
+          updateStatistics();
+        }
+      } catch (error) {
+        console.error('Erro ao carregar clientes recentes:', error);
+      }
+    }
+
+    function renderRecentClients() {
+      const container = document.getElementById('recentClientsList');
+      
+      if (recentClients.length === 0) {
+        container.innerHTML = `
+          <div class="text-center text-gray-500 text-sm py-4">
+            <i class="fas fa-user-plus text-2xl mb-2 block"></i>
+            Nenhum cadastro recente
+          </div>
+        `;
+        return;
+      }
+      
+      container.innerHTML = recentClients.map(client => `
+        <div class="recent-client-item">
+          <div class="recent-client-name">${client.name}</div>
+          <div class="recent-client-info">
+            ${formatCPF(client.cpf)} • ${client.city || 'Cidade não informada'}
+          </div>
+          <button onclick="duplicateClient('${client.cpf}')" class="client-quick-action" title="Duplicar cliente">
+            <i class="fas fa-copy"></i>
+          </button>
+        </div>
+      `).join('');
+    }
+
+    function updateStatistics() {
+      const today = new Date();
+      const todayStr = today.toISOString().split('T')[0];
+      
+      // Calcular estatísticas (simulado - você pode melhorar com dados reais da API)
+      const todayCount = recentClients.filter(c => 
+        c.created_at && c.created_at.startsWith(todayStr)
+      ).length;
+      
+      const weekStart = new Date(today);
+      weekStart.setDate(today.getDate() - 7);
+      const weekCount = recentClients.length; // Simplificado
+      
+      document.getElementById('todayRegistrations').textContent = todayCount;
+      document.getElementById('weekRegistrations').textContent = weekCount;
+    }
+
+    async function duplicateClient(cpf) {
+      const client = recentClients.find(c => c.cpf === cpf);
+      if (!client) return;
+      
+      // Preencher formulário com dados do cliente (exceto CPF e Serial)
+      Object.keys(client).forEach(key => {
+        if (key !== 'cpf' && key !== 'serial' && key !== 'id') {
+          const input = document.getElementById(key);
+          if (input && client[key]) {
+            input.value = client[key];
+          }
+        }
+      });
+      
+      updateProgress();
+      showModal('Sucesso', 'Dados do cliente duplicados! Altere CPF e Serial antes de salvar.', 'fas fa-copy text-green-600');
+    }
+
+    // ===== FUNÇÕES QUICK ACTIONS =====
+    function generatePPPoE() {
+      const name = document.getElementById('name').value;
+      if (!name) {
+        showModal('Aviso', 'Digite o nome do cliente primeiro.', 'fas fa-exclamation-triangle text-yellow-600');
+        return;
+      }
+      
+      // Gerar usuário baseado no nome (simplificado)
+      const cleanName = name.toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^a-z0-9]/g, '');
+      
+      const randomNum = Math.floor(Math.random() * 999) + 1;
+      const username = cleanName.substring(0, 8) + randomNum.toString().padStart(3, '0');
+      const password = Math.random().toString(36).substring(2, 10);
+      
+      document.getElementById('pppoe').value = username;
+      document.getElementById('password').value = password;
+      
+      updateProgress();
+      showModal('Sucesso', 'PPPoE e senha gerados automaticamente!', 'fas fa-magic text-purple-600');
+    }
+
+    function duplicateLastClient() {
+      if (recentClients.length === 0) {
+        showModal('Aviso', 'Nenhum cliente recente encontrado.', 'fas fa-info-circle text-blue-600');
+        return;
+      }
+      duplicateClient(recentClients[0].cpf);
+    }
+
+    function exportFormPDF() {
+      const formData = getClientData();
+      if (!formData.name) {
+        showModal('Aviso', 'Preencha pelo menos o nome para gerar PDF.', 'fas fa-exclamation-triangle text-yellow-600');
+        return;
+      }
+      
+      // Implementação simplificada - você pode melhorar com uma biblioteca de PDF
+      showModal('Info', 'Funcionalidade de PDF em desenvolvimento.', 'fas fa-info-circle text-blue-600');
+    }
+
+    // ===== ATALHOS DE TECLADO =====
+    function setupKeyboardShortcuts() {
+      document.addEventListener('keydown', function(e) {
+        // Ctrl+S - Salvar
+        if (e.ctrlKey && e.key === 's') {
+          e.preventDefault();
+          saveClient();
+          showKeyboardShortcut('Salvando...');
+        }
+        
+        // Ctrl+R - Revisar
+        if (e.ctrlKey && e.key === 'r') {
+          e.preventDefault();
+          toggleReviewModal();
+          showKeyboardShortcut('Abrindo revisão...');
+        }
+        
+        // Ctrl+L - Limpar
+        if (e.ctrlKey && e.key === 'l') {
+          e.preventDefault();
+          clearForm();
+          showKeyboardShortcut('Formulário limpo');
+        }
+        
+        // Esc - Fechar modais
+        if (e.key === 'Escape') {
+          closeModal();
+          toggleReviewModal();
+        }
+      });
+    }
+
+    function showKeyboardShortcut(message) {
+      const shortcutDiv = document.getElementById('keyboardShortcut') || createKeyboardShortcutDiv();
+      shortcutDiv.textContent = message;
+      shortcutDiv.classList.add('show');
+      setTimeout(() => shortcutDiv.classList.remove('show'), 2000);
+    }
+
+    function createKeyboardShortcutDiv() {
+      const div = document.createElement('div');
+      div.id = 'keyboardShortcut';
+      div.className = 'keyboard-shortcut';
+      document.body.appendChild(div);
+      return div;
     }
 
     function validateCPFRealtime(e) {

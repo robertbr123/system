@@ -81,6 +81,24 @@ try {
             sendError(401, 'Não autenticado', 'Sessão não encontrada');
         }
         
+        // Verificar se é solicitação de clientes recentes
+        if (isset($_GET['recent'])) {
+            $limit = intval($_GET['recent']);
+            if ($limit <= 0 || $limit > 50) $limit = 5;
+            
+            $stmt = $conn->prepare("
+                SELECT c.*, p.name AS plan_name
+                FROM clients c
+                LEFT JOIN plans p ON c.planId = p.id
+                ORDER BY c.created_at DESC
+                LIMIT ?
+            ");
+            $stmt->execute([$limit]);
+            $clients = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            echo json_encode(['success' => true, 'data' => $clients]);
+            exit;
+        }
+        
         // Tentar pegar do cache
         $cacheKey = 'clients_list';
         if ($redis) {
