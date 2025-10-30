@@ -333,6 +333,10 @@
           <i class="fas fa-barcode"></i>
         </div>
         <div class="input-icon">
+          <input id="searchPPPoE" type="text" placeholder="Buscar por PPPoE..." class="p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 w-full" onkeyup="filterClients()" />
+          <i class="fas fa-globe"></i>
+        </div>
+        <div class="input-icon">
           <select id="filterCity" class="p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 w-full" onchange="filterClients()">
             <option value="">Todas as cidades</option>
             <option value="Ipixuna">Ipixuna</option>
@@ -366,17 +370,74 @@
           <input id="filterDueDay" type="number" min="10" max="30" step="10" placeholder="Dia de vencimento..." class="p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 w-full" onchange="filterClients()" />
           <i class="fas fa-calendar"></i>
         </div>
+        <div class="input-icon">
+          <select id="filterDueSoon" class="p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 w-full" onchange="filterClients()">
+            <option value="">Vencimento em...</option>
+            <option value="0">Venceu hoje</option>
+            <option value="1">Vence em 1 dia</option>
+            <option value="3">Vence em 3 dias</option>
+            <option value="7">Vence em 7 dias</option>
+            <option value="15">Vence em 15 dias</option>
+            <option value="30">Vence em 30 dias</option>
+          </select>
+          <i class="fas fa-clock"></i>
+        </div>
+        <div class="input-icon">
+          <select id="filterEquipment" class="p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 w-full" onchange="filterClients()">
+            <option value="">Todos os equipamentos</option>
+          </select>
+          <i class="fas fa-router"></i>
+        </div>
+        <div class="input-icon">
+          <button onclick="clearAllFilters()" class="p-3 border rounded-lg bg-orange-500 text-white hover:bg-orange-600 transition w-full flex items-center justify-center gap-2">
+            <i class="fas fa-broom"></i> Limpar Filtros
+          </button>
+        </div>
+      </div>
+
+      <!-- Segunda linha de filtros avançados -->
+      <div class="mb-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div class="input-icon">
+          <input id="searchAddress" type="text" placeholder="Buscar por endereço..." class="p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 w-full" onkeyup="filterClients()" />
+          <i class="fas fa-map-marker"></i>
+        </div>
+        <div class="input-icon">
+          <input id="searchPhone" type="text" placeholder="Buscar por telefone..." class="p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 w-full" onkeyup="filterClients()" />
+          <i class="fas fa-phone"></i>
+        </div>
+        <div class="input-icon">
+          <select id="filterAge" class="p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 w-full" onchange="filterClients()">
+            <option value="">Todas as idades</option>
+            <option value="18-25">18-25 anos</option>
+            <option value="26-35">26-35 anos</option>
+            <option value="36-45">36-45 anos</option>
+            <option value="46-60">46-60 anos</option>
+            <option value="60+">60+ anos</option>
+          </select>
+          <i class="fas fa-birthday-cake"></i>
+        </div>
+        <div class="input-icon">
+          <button onclick="toggleAdvancedFilters()" class="p-3 border rounded-lg bg-purple-500 text-white hover:bg-purple-600 transition w-full flex items-center justify-center gap-2">
+            <i class="fas fa-filter"></i> <span id="advancedToggleText">Filtros Avançados</span>
+          </button>
+        </div>
       </div>
 
       <div class="flex flex-col sm:flex-row justify-center gap-4 mb-6">
         <button onclick="exportToCSV()" class="btn-report text-white flex items-center gap-2">
-          <i class="fas fa-download"></i> Exportar CSV
+          <i class="fas fa-file-csv"></i> Exportar CSV
+        </button>
+        <button onclick="exportToExcel()" class="btn-report text-white flex items-center gap-2">
+          <i class="fas fa-file-excel"></i> Exportar Excel
+        </button>
+        <button onclick="exportToPDF()" class="btn-report text-white flex items-center gap-2">
+          <i class="fas fa-file-pdf"></i> Exportar PDF
         </button>
         <button onclick="openImportModal()" class="btn-report text-white flex items-center gap-2">
           <i class="fas fa-upload"></i> Importar CSV
         </button>
         <button onclick="window.location.href='/system/report.html'" class="btn-report text-white flex items-center gap-2">
-          <i class="fas fa-file-pdf"></i> Gerar Relatório
+          <i class="fas fa-chart-bar"></i> Relatórios
         </button>
         <button onclick="window.location.href='/system/index.html'" class="btn-edit text-white flex items-center gap-2">
           <i class="fas fa-user-plus"></i> Novo Cliente
@@ -464,6 +525,53 @@
         </button>
         <button onclick="importCSVData()" id="importBtn" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition flex items-center gap-2 disabled:opacity-50" disabled>
           <i class="fas fa-check"></i> Importar
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal de Histórico do Cliente -->
+  <div id="historyModal" class="modal fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden z-50">
+    <div class="bg-white p-6 rounded-lg shadow-xl max-w-4xl w-full sm:w-11/12 max-h-[90vh] overflow-y-auto">
+      <h3 class="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
+        <i class="fas fa-history text-purple-600"></i> 
+        <span id="historyClientName">Histórico do Cliente</span>
+      </h3>
+      
+      <!-- Loading -->
+      <div id="historyLoading" class="text-center py-8">
+        <i class="fas fa-spinner fa-spin text-purple-600 text-2xl mb-2"></i>
+        <p class="text-gray-600">Carregando histórico...</p>
+      </div>
+
+      <!-- Lista de histórico -->
+      <div id="historyContent" class="hidden">
+        <div id="historyList" class="space-y-3 max-h-96 overflow-y-auto">
+          <!-- Histórico será inserido aqui -->
+        </div>
+        
+        <!-- Paginação do histórico -->
+        <div id="historyPagination" class="flex justify-center items-center gap-2 mt-4">
+          <button onclick="previousHistoryPage()" class="px-3 py-1 bg-purple-600 text-white rounded hover:bg-purple-700 disabled:opacity-50" id="prevHistoryBtn">
+            <i class="fas fa-chevron-left"></i>
+          </button>
+          <span id="historyPageInfo" class="px-2 py-1 bg-gray-100 rounded text-sm">Página 1</span>
+          <button onclick="nextHistoryPage()" class="px-3 py-1 bg-purple-600 text-white rounded hover:bg-purple-700 disabled:opacity-50" id="nextHistoryBtn">
+            <i class="fas fa-chevron-right"></i>
+          </button>
+        </div>
+      </div>
+
+      <!-- Sem histórico -->
+      <div id="noHistory" class="text-center py-8 hidden">
+        <i class="fas fa-history text-gray-400 text-4xl mb-3"></i>
+        <p class="text-gray-600">Nenhum histórico encontrado para este cliente.</p>
+      </div>
+
+      <!-- Botão fechar -->
+      <div class="flex justify-end mt-6">
+        <button onclick="closeHistoryModal()" class="px-4 py-2 bg-gray-300 text-gray-800 rounded-lg hover:bg-gray-400 transition flex items-center gap-2">
+          <i class="fas fa-times"></i> Fechar
         </button>
       </div>
     </div>
@@ -675,6 +783,9 @@
                 </div>
               </div>
               <div class="flex gap-2">
+                <button onclick="viewClientHistory('${client.cpf}', '${client.name.replace(/'/g, "\\'")}')" class="btn-report bg-purple-600 text-white p-2 rounded-lg hover:bg-purple-700" title="Ver Histórico">
+                  <i class="fas fa-history"></i>
+                </button>
                 <button onclick="editClient('${client.cpf}')" class="btn-edit bg-blue-600 text-white p-2 rounded-lg hover:bg-blue-700">
                   <i class="fas fa-edit"></i> Editar
                 </button>
@@ -694,24 +805,69 @@
       const searchName = document.getElementById('searchName').value.toLowerCase();
       const searchCPF = document.getElementById('searchCPF').value.toLowerCase();
       const searchSerial = document.getElementById('searchSerial').value.toLowerCase();
+      const searchPPPoE = document.getElementById('searchPPPoE').value.toLowerCase();
+      const searchAddress = document.getElementById('searchAddress').value.toLowerCase();
+      const searchPhone = document.getElementById('searchPhone').value.toLowerCase();
       const filterCity = document.getElementById('filterCity').value;
       const filterStatus = document.getElementById('filterStatus').value;
       const filterPlan = document.getElementById('filterPlan').value;
       const filterInstaller = document.getElementById('filterInstaller').value;
       const filterDueDay = document.getElementById('filterDueDay').value;
+      const filterDueSoon = document.getElementById('filterDueSoon').value;
+      const filterEquipment = document.getElementById('filterEquipment').value;
+      const filterAge = document.getElementById('filterAge').value;
 
       filteredClients = allClients.filter(client => {
         const matchesName = client.name.toLowerCase().includes(searchName);
         const matchesCPF = client.cpf.includes(searchCPF);
         const matchesSerial = client.serial.toLowerCase().includes(searchSerial);
+        const matchesPPPoE = client.pppoe ? client.pppoe.toLowerCase().includes(searchPPPoE) : searchPPPoE === '';
+        const matchesAddress = client.address ? client.address.toLowerCase().includes(searchAddress) : searchAddress === '';
+        const matchesPhone = client.phone ? client.phone.includes(searchPhone) : searchPhone === '';
         const matchesCity = !filterCity || client.city === filterCity;
         const matchesStatus = !filterStatus || client.active.toString() === filterStatus;
         const matchesPlan = !filterPlan || client.plan_name === filterPlan;
         const matchesInstaller = !filterInstaller || client.installer === filterInstaller;
         const matchesDueDay = !filterDueDay || (client.dueDay && client.dueDay.toString() === filterDueDay);
+        const matchesEquipment = !filterEquipment || client.equipment_name === filterEquipment;
         
-        return matchesName && matchesCPF && matchesSerial && matchesCity && matchesStatus && 
-               matchesPlan && matchesInstaller && matchesDueDay;
+        // Filtro por vencimento próximo
+        let matchesDueSoon = true;
+        if (filterDueSoon) {
+          const today = new Date();
+          const daysUntilDue = parseInt(filterDueSoon);
+          const targetDate = new Date(today.getFullYear(), today.getMonth(), parseInt(client.dueDay || 10));
+          
+          if (targetDate < today) {
+            targetDate.setMonth(targetDate.getMonth() + 1);
+          }
+          
+          const diffTime = targetDate - today;
+          const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+          
+          if (daysUntilDue === 0) {
+            matchesDueSoon = diffDays === 0;
+          } else {
+            matchesDueSoon = diffDays <= daysUntilDue && diffDays >= 0;
+          }
+        }
+        
+        // Filtro por idade
+        let matchesAge = true;
+        if (filterAge && client.birthDate) {
+          const age = calculateAge(client.birthDate);
+          switch(filterAge) {
+            case '18-25': matchesAge = age >= 18 && age <= 25; break;
+            case '26-35': matchesAge = age >= 26 && age <= 35; break;
+            case '36-45': matchesAge = age >= 36 && age <= 45; break;
+            case '46-60': matchesAge = age >= 46 && age <= 60; break;
+            case '60+': matchesAge = age > 60; break;
+          }
+        }
+        
+        return matchesName && matchesCPF && matchesSerial && matchesPPPoE && matchesAddress && 
+               matchesPhone && matchesCity && matchesStatus && matchesPlan && matchesInstaller && 
+               matchesDueDay && matchesDueSoon && matchesEquipment && matchesAge;
       });
 
       currentPage = 1;
@@ -764,6 +920,7 @@
         if (c.plan_name) plansSet.add(c.plan_name);
       });
       const planSelect = document.getElementById('filterPlan');
+      planSelect.innerHTML = '<option value="">Todos os planos</option>';
       plansSet.forEach(plan => {
         const option = document.createElement('option');
         option.value = plan;
@@ -777,11 +934,26 @@
         if (c.installer) installersSet.add(c.installer);
       });
       const installerSelect = document.getElementById('filterInstaller');
+      installerSelect.innerHTML = '<option value="">Todos os instaladores</option>';
       installersSet.forEach(installer => {
         const option = document.createElement('option');
         option.value = installer;
         option.textContent = installer;
         installerSelect.appendChild(option);
+      });
+
+      // Preencher filtro de Equipamentos
+      const equipmentSet = new Set();
+      allClients.forEach(c => {
+        if (c.equipment_name) equipmentSet.add(c.equipment_name);
+      });
+      const equipmentSelect = document.getElementById('filterEquipment');
+      equipmentSelect.innerHTML = '<option value="">Todos os equipamentos</option>';
+      equipmentSet.forEach(equipment => {
+        const option = document.createElement('option');
+        option.value = equipment;
+        option.textContent = equipment;
+        equipmentSelect.appendChild(option);
       });
     }
 
@@ -1041,6 +1213,167 @@
       showModal('Sucesso', `${filteredClients.length} cliente(s) exportado(s) com sucesso!`, 'fas fa-check-circle text-green-600');
     }
 
+    function exportToExcel() {
+      if (filteredClients.length === 0) {
+        showModal('Aviso', 'Nenhum cliente para exportar. Ajuste os filtros e tente novamente.', 'fas fa-info-circle text-blue-600');
+        return;
+      }
+
+      // Preparar dados para Excel
+      const headers = ['Nome', 'CPF', 'Serial', 'Endereço', 'Número', 'Complemento', 'Cidade', 'Telefone', 'Data Nascimento', 'Plano', 'Instalador', 'PPPoE', 'Vencimento', 'Equipamento', 'Status', 'Observação'];
+      
+      const data = [headers];
+      filteredClients.forEach(client => {
+        data.push([
+          client.name,
+          client.cpf,
+          client.serial,
+          client.address || '',
+          client.number || '',
+          client.complement || '',
+          client.city || '',
+          formatPhone(client.phone) || '',
+          formatDate(client.birthDate) || '',
+          client.plan_name || '',
+          client.installer || '',
+          client.pppoe || '',
+          client.dueDay || '',
+          client.equipment_name || '',
+          client.active ? 'Ativo' : 'Inativo',
+          client.observation || ''
+        ]);
+      });
+
+      // Criar workbook
+      const ws = XLSX.utils.aoa_to_sheet(data);
+      const wb = XLSX.utils.book_new();
+      
+      // Adicionar estilo às headers
+      const range = XLSX.utils.decode_range(ws['!ref']);
+      for (let col = range.s.c; col <= range.e.c; col++) {
+        const cellAddress = XLSX.utils.encode_cell({ r: 0, c: col });
+        if (!ws[cellAddress]) continue;
+        ws[cellAddress].s = {
+          font: { bold: true },
+          fill: { fgColor: { rgb: "CCCCCC" } }
+        };
+      }
+
+      // Ajustar largura das colunas
+      ws['!cols'] = [
+        { wch: 25 }, // Nome
+        { wch: 15 }, // CPF
+        { wch: 15 }, // Serial
+        { wch: 30 }, // Endereço
+        { wch: 8 },  // Número
+        { wch: 15 }, // Complemento
+        { wch: 15 }, // Cidade
+        { wch: 15 }, // Telefone
+        { wch: 12 }, // Data Nascimento
+        { wch: 20 }, // Plano
+        { wch: 20 }, // Instalador
+        { wch: 15 }, // PPPoE
+        { wch: 10 }, // Vencimento
+        { wch: 20 }, // Equipamento
+        { wch: 10 }, // Status
+        { wch: 30 }  // Observação
+      ];
+
+      XLSX.utils.book_append_sheet(wb, ws, "Clientes");
+
+      // Download
+      const fileName = `clientes_${new Date().toISOString().split('T')[0]}.xlsx`;
+      XLSX.writeFile(wb, fileName);
+      
+      showModal('Sucesso', `${filteredClients.length} cliente(s) exportado(s) para Excel com sucesso!`, 'fas fa-check-circle text-green-600');
+    }
+
+    function exportToPDF() {
+      if (filteredClients.length === 0) {
+        showModal('Aviso', 'Nenhum cliente para exportar. Ajuste os filtros e tente novamente.', 'fas fa-info-circle text-blue-600');
+        return;
+      }
+
+      // Criar nova janela para PDF
+      const printWindow = window.open('', '_blank');
+      
+      let html = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <title>Lista de Clientes</title>
+          <style>
+            body { font-family: Arial, sans-serif; font-size: 12px; margin: 20px; }
+            h1 { color: #333; text-align: center; margin-bottom: 30px; }
+            table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+            th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+            th { background-color: #f2f2f2; font-weight: bold; }
+            tr:nth-child(even) { background-color: #f9f9f9; }
+            .header-info { margin-bottom: 20px; }
+            .status-ativo { color: green; font-weight: bold; }
+            .status-inativo { color: red; font-weight: bold; }
+            @media print {
+              @page { margin: 1cm; }
+              body { margin: 0; }
+            }
+          </style>
+        </head>
+        <body>
+          <h1>Lista de Clientes</h1>
+          <div class="header-info">
+            <p><strong>Data de Geração:</strong> ${new Date().toLocaleDateString('pt-BR')}</p>
+            <p><strong>Total de Clientes:</strong> ${filteredClients.length}</p>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th>Nome</th>
+                <th>CPF</th>
+                <th>Cidade</th>
+                <th>Telefone</th>
+                <th>Plano</th>
+                <th>PPPoE</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+      `;
+
+      filteredClients.forEach(client => {
+        const statusClass = client.active ? 'status-ativo' : 'status-inativo';
+        const statusText = client.active ? 'Ativo' : 'Inativo';
+        
+        html += `
+          <tr>
+            <td>${client.name}</td>
+            <td>${client.cpf}</td>
+            <td>${client.city || ''}</td>
+            <td>${formatPhone(client.phone) || ''}</td>
+            <td>${client.plan_name || ''}</td>
+            <td>${client.pppoe || ''}</td>
+            <td class="${statusClass}">${statusText}</td>
+          </tr>
+        `;
+      });
+
+      html += `
+            </tbody>
+          </table>
+        </body>
+        </html>
+      `;
+
+      printWindow.document.write(html);
+      printWindow.document.close();
+      
+      // Aguardar carregar e imprimir
+      printWindow.onload = function() {
+        printWindow.print();
+      };
+
+      showModal('Sucesso', 'PDF gerado com sucesso! Verifique a janela de impressão.', 'fas fa-check-circle text-green-600');
+    }
+
     let csvData = [];
 
     function openImportModal() {
@@ -1269,6 +1602,260 @@
       } finally {
         importBtn.disabled = false;
         importBtn.innerHTML = '<i class="fas fa-check"></i> Importar';
+      }
+    }
+
+    // Funções auxiliares para os novos filtros
+    function calculateAge(birthDate) {
+      if (!birthDate) return 0;
+      const today = new Date();
+      const birth = new Date(birthDate);
+      let age = today.getFullYear() - birth.getFullYear();
+      const monthDiff = today.getMonth() - birth.getMonth();
+      if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
+        age--;
+      }
+      return age;
+    }
+
+    function clearAllFilters() {
+      document.getElementById('searchName').value = '';
+      document.getElementById('searchCPF').value = '';
+      document.getElementById('searchSerial').value = '';
+      document.getElementById('searchPPPoE').value = '';
+      document.getElementById('searchAddress').value = '';
+      document.getElementById('searchPhone').value = '';
+      document.getElementById('filterCity').value = '';
+      document.getElementById('filterStatus').value = '';
+      document.getElementById('filterPlan').value = '';
+      document.getElementById('filterInstaller').value = '';
+      document.getElementById('filterDueDay').value = '';
+      document.getElementById('filterDueSoon').value = '';
+      document.getElementById('filterEquipment').value = '';
+      document.getElementById('filterAge').value = '';
+      
+      filterClients();
+    }
+
+    function toggleAdvancedFilters() {
+      const secondRow = document.querySelectorAll('.mb-6')[1];
+      const toggleText = document.getElementById('advancedToggleText');
+      
+      if (secondRow.style.display === 'none') {
+        secondRow.style.display = 'grid';
+        toggleText.textContent = 'Ocultar Filtros';
+      } else {
+        secondRow.style.display = 'none';
+        toggleText.textContent = 'Filtros Avançados';
+      }
+    }
+
+    // Inicializar filtros avançados como ocultos
+    document.addEventListener('DOMContentLoaded', function() {
+      const secondRow = document.querySelectorAll('.mb-6')[1];
+      if (secondRow) {
+        secondRow.style.display = 'none';
+      }
+    });
+
+    // Variáveis para histórico
+    let currentHistoryPage = 1;
+    let historyData = [];
+    let currentClientCpf = '';
+    const historyItemsPerPage = 20;
+
+    // Função para visualizar histórico do cliente
+    async function viewClientHistory(cpf, name) {
+      currentClientCpf = cpf;
+      currentHistoryPage = 1;
+      
+      document.getElementById('historyClientName').textContent = `Histórico de ${name}`;
+      document.getElementById('historyModal').classList.remove('hidden');
+      document.getElementById('historyLoading').classList.remove('hidden');
+      document.getElementById('historyContent').classList.add('hidden');
+      document.getElementById('noHistory').classList.add('hidden');
+
+      try {
+        await loadClientHistory(cpf);
+      } catch (error) {
+        console.error('Erro ao carregar histórico:', error);
+        showModal('Erro', 'Erro ao carregar histórico do cliente', 'fas fa-exclamation-circle text-red-600');
+        closeHistoryModal();
+      }
+    }
+
+    async function loadClientHistory(cpf, page = 1) {
+      const offset = (page - 1) * historyItemsPerPage;
+      
+      try {
+        const response = await fetch(`/system/api/client_history.php?client_cpf=${cpf}&limit=${historyItemsPerPage}&offset=${offset}`, {
+          credentials: 'include'
+        });
+
+        if (!response.ok) {
+          throw new Error(`Erro HTTP ${response.status}`);
+        }
+
+        const result = await response.json();
+        
+        if (!result.success) {
+          throw new Error(result.error || 'Erro ao carregar histórico');
+        }
+
+        historyData = result.data || [];
+        currentHistoryPage = page;
+        
+        document.getElementById('historyLoading').classList.add('hidden');
+        
+        if (historyData.length === 0 && page === 1) {
+          document.getElementById('noHistory').classList.remove('hidden');
+        } else {
+          document.getElementById('historyContent').classList.remove('hidden');
+          renderHistory();
+        }
+
+      } catch (error) {
+        console.error('Erro ao carregar histórico:', error);
+        throw error;
+      }
+    }
+
+    function renderHistory() {
+      const historyList = document.getElementById('historyList');
+      historyList.innerHTML = '';
+
+      historyData.forEach(record => {
+        const div = document.createElement('div');
+        div.className = 'p-4 border rounded-lg bg-gray-50';
+        
+        const actionIcon = getActionIcon(record.action_type);
+        const actionColor = getActionColor(record.action_type);
+        const formattedDate = new Date(record.created_at).toLocaleString('pt-BR');
+
+        div.innerHTML = `
+          <div class="flex items-start gap-3">
+            <div class="flex-shrink-0">
+              <i class="${actionIcon} ${actionColor} text-lg"></i>
+            </div>
+            <div class="flex-1">
+              <div class="flex justify-between items-start mb-2">
+                <h4 class="font-semibold text-gray-800">${getActionText(record.action_type)}</h4>
+                <span class="text-sm text-gray-500">${formattedDate}</span>
+              </div>
+              
+              ${record.action_description ? `<p class="text-gray-600 mb-2">${record.action_description}</p>` : ''}
+              
+              ${record.old_data || record.new_data ? `
+                <details class="mt-2">
+                  <summary class="cursor-pointer text-blue-600 hover:text-blue-800 text-sm">Ver detalhes das alterações</summary>
+                  <div class="mt-2 p-3 bg-white rounded border text-sm">
+                    ${record.old_data ? `
+                      <div class="mb-2">
+                        <strong class="text-red-600">Dados anteriores:</strong>
+                        <pre class="mt-1 text-xs bg-red-50 p-2 rounded overflow-x-auto">${JSON.stringify(record.old_data, null, 2)}</pre>
+                      </div>
+                    ` : ''}
+                    ${record.new_data ? `
+                      <div>
+                        <strong class="text-green-600">Novos dados:</strong>
+                        <pre class="mt-1 text-xs bg-green-50 p-2 rounded overflow-x-auto">${JSON.stringify(record.new_data, null, 2)}</pre>
+                      </div>
+                    ` : ''}
+                  </div>
+                </details>
+              ` : ''}
+              
+              <div class="text-xs text-gray-400 mt-2">
+                IP: ${record.ip_address} | Usuário: ${record.user_id}
+              </div>
+            </div>
+          </div>
+        `;
+        
+        historyList.appendChild(div);
+      });
+
+      updateHistoryPagination();
+    }
+
+    function getActionIcon(actionType) {
+      const icons = {
+        'CREATE': 'fas fa-plus-circle',
+        'UPDATE': 'fas fa-edit',
+        'DELETE': 'fas fa-trash-alt',
+        'LOGIN': 'fas fa-sign-in-alt',
+        'VIEW': 'fas fa-eye'
+      };
+      return icons[actionType] || 'fas fa-circle';
+    }
+
+    function getActionColor(actionType) {
+      const colors = {
+        'CREATE': 'text-green-600',
+        'UPDATE': 'text-blue-600',
+        'DELETE': 'text-red-600',
+        'LOGIN': 'text-purple-600',
+        'VIEW': 'text-gray-600'
+      };
+      return colors[actionType] || 'text-gray-600';
+    }
+
+    function getActionText(actionType) {
+      const texts = {
+        'CREATE': 'Cliente Criado',
+        'UPDATE': 'Cliente Atualizado',
+        'DELETE': 'Cliente Excluído',
+        'LOGIN': 'Login Realizado',
+        'VIEW': 'Cliente Visualizado'
+      };
+      return texts[actionType] || actionType;
+    }
+
+    function updateHistoryPagination() {
+      const hasMore = historyData.length === historyItemsPerPage;
+      
+      document.getElementById('prevHistoryBtn').disabled = currentHistoryPage <= 1;
+      document.getElementById('nextHistoryBtn').disabled = !hasMore;
+      document.getElementById('historyPageInfo').textContent = `Página ${currentHistoryPage}`;
+    }
+
+    async function previousHistoryPage() {
+      if (currentHistoryPage > 1) {
+        await loadClientHistory(currentClientCpf, currentHistoryPage - 1);
+      }
+    }
+
+    async function nextHistoryPage() {
+      await loadClientHistory(currentClientCpf, currentHistoryPage + 1);
+    }
+
+    function closeHistoryModal() {
+      document.getElementById('historyModal').classList.add('hidden');
+      historyData = [];
+      currentClientCpf = '';
+      currentHistoryPage = 1;
+    }
+
+    // Função para registrar ação no histórico
+    async function logClientAction(cpf, name, actionType, description = null, oldData = null, newData = null) {
+      try {
+        await fetch('/system/api/client_history.php', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          credentials: 'include',
+          body: JSON.stringify({
+            client_cpf: cpf,
+            client_name: name,
+            action_type: actionType,
+            action_description: description,
+            old_data: oldData,
+            new_data: newData
+          })
+        });
+      } catch (error) {
+        console.error('Erro ao registrar ação no histórico:', error);
       }
     }
 
