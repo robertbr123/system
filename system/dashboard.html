@@ -1,0 +1,1369 @@
+<script type="text/javascript">
+        var gk_isXlsx = false;
+        var gk_xlsxFileLookup = {};
+        var gk_fileData = {};
+        function filledCell(cell) {
+          return cell !== '' && cell != null;
+        }
+        function loadFileData(filename) {
+        if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
+            try {
+                var workbook = XLSX.read(gk_fileData[filename], { type: 'base64' });
+                var firstSheetName = workbook.SheetNames[0];
+                var worksheet = workbook.Sheets[firstSheetName];
+
+                // Convert sheet to JSON to filter blank rows
+                var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false, defval: '' });
+                // Filter out blank rows (rows where all cells are empty, null, or undefined)
+                var filteredData = jsonData.filter(row => row.some(filledCell));
+
+                // Heuristic to find the header row by ignoring rows with fewer filled cells than the next row
+                var headerRowIndex = filteredData.findIndex((row, index) =>
+                  row.filter(filledCell).length >= filteredData[index + 1]?.filter(filledCell).length
+                );
+                // Fallback
+                if (headerRowIndex === -1 || headerRowIndex > 25) {
+                  headerRowIndex = 0;
+                }
+
+                // Convert filtered JSON back to CSV
+                var csv = XLSX.utils.aoa_to_sheet(filteredData.slice(headerRowIndex)); // Create a new sheet from filtered array of arrays
+                csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
+                return csv;
+            } catch (e) {
+                console.error(e);
+                return "";
+            }
+        }
+        return gk_fileData[filename] || "";
+        }
+        </script><!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard - Sistema ERP</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" integrity="sha512-iecdLmaskl7CVkqkXNQ/ZH/XLlvWZOJyj7Yy7tcenmpD1ypASozpmT/E0iPtmFIB46ZmdtAc9eNBvH0H/ZpiBw==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.min.css" />
+  <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.7.0/jquery.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jqueryui/1.14.0/jquery-ui.min.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/jqueryui/1.14.0/themes/base/jquery-ui.min.css" />
+  <style>
+    body {
+      font-family: 'Poppins', sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+    }
+    .gradient-header {
+      background: rgba(255, 255, 255, 0.1);
+      backdrop-filter: blur(10px);
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    .nav-link {
+      position: relative;
+      transition: color 0.3s ease;
+    }
+    .nav-link::after {
+      content: '';
+      position: absolute;
+      width: 0;
+      height: 2px;
+      bottom: -2px;
+      left: 0;
+      background-color: #ffffff;
+      transition: width 0.3s ease;
+    }
+    .nav-link:hover::after {
+      width: 100%;
+    }
+    .card {
+      background: rgba(255, 255, 255, 0.95);
+      border-radius: 20px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+      transition: all 0.3s ease;
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      overflow: hidden;
+    }
+    .card:hover {
+      transform: translateY(-5px);
+      box-shadow: 0 15px 35px rgba(0, 0, 0, 0.2);
+    }
+    .metric-card {
+      position: relative;
+      overflow: hidden;
+    }
+    .metric-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(45deg, transparent, rgba(255, 255, 255, 0.1));
+      pointer-events: none;
+    }
+    .metric-value {
+      font-size: 2.5rem;
+      font-weight: 700;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .btn-primary, .btn-filter, .btn-whatsapp {
+      transition: transform 0.2s, background-color 0.2s, box-shadow 0.2s, filter 0.2s;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-weight: 500;
+    }
+    .btn-primary, .btn-filter, .btn-whatsapp {
+      transition: all 0.3s ease;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      font-weight: 600;
+      padding: 0.75rem 1.5rem;
+      font-size: 0.95rem;
+      letter-spacing: 0.5px;
+      border: none;
+      cursor: pointer;
+    }
+    .btn-primary {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    }
+    .btn-filter {
+      background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+    }
+    .btn-whatsapp {
+      background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    }
+    .btn-primary:hover, .btn-filter:hover, .btn-whatsapp:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
+    }
+    .btn-primary:active, .btn-filter:active, .btn-whatsapp:active {
+      transform: translateY(0);
+    }
+    .modal {
+      transition: all 0.3s ease-in-out;
+      transform: scale(0.95);
+      backdrop-filter: blur(8px);
+    }
+    .modal.show {
+      transform: scale(1);
+    }
+    .table-container {
+      max-height: 400px;
+      overflow-y: auto;
+    }
+    table {
+      width: 100%;
+      border-collapse: separate;
+      border-spacing: 0;
+    }
+    th, td {
+      border: none;
+      padding: 16px;
+      text-align: left;
+      font-size: 0.9rem;
+    }
+    th {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    th:first-child {
+      border-top-left-radius: 12px;
+    }
+    th:last-child {
+      border-top-right-radius: 12px;
+    }
+    tr:nth-child(even) {
+      background-color: rgba(255, 255, 255, 0.05);
+    }
+    tr {
+      transition: all 0.3s ease;
+    }
+    tr:hover {
+      background-color: rgba(255, 255, 255, 0.1);
+      transform: scale(1.01);
+    }
+    .widget {
+      position: relative;
+      cursor: grab;
+      user-select: none;
+    }
+    .widget.ui-sortable-helper {
+      opacity: 0.8;
+      z-index: 100;
+    }
+    .widget-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-bottom: 1rem;
+      border-bottom: 1px solid rgba(0,0,0,0.1);
+      margin-bottom: 1rem;
+    }
+    .widget-controls {
+      display: flex;
+      gap: 0.5rem;
+    }
+    .widget-btn {
+      padding: 0.25rem 0.5rem;
+      border: none;
+      background: rgba(0,0,0,0.1);
+      border-radius: 4px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .widget-btn:hover {
+      background: rgba(0,0,0,0.2);
+    }
+    #mapContainer {
+      height: 400px;
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+    }
+    .leaflet-container {
+      font-family: 'Poppins', sans-serif;
+    }
+    .theme-toggle {
+      display: flex;
+      gap: 0.5rem;
+      margin-bottom: 1rem;
+    }
+    .theme-btn {
+      padding: 0.5rem 1rem;
+      border: 2px solid transparent;
+      border-radius: 8px;
+      background: rgba(255,255,255,0.3);
+      color: white;
+      cursor: pointer;
+      transition: all 0.3s;
+    }
+    .theme-btn.active {
+      border-color: white;
+      background: rgba(255,255,255,0.5);
+    }
+    .customize-panel {
+      background: rgba(255,255,255,0.95);
+      border-radius: 12px;
+      padding: 1.5rem;
+      margin-bottom: 1.5rem;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+    }
+    .widget-list {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 1rem;
+    }
+    .widget-toggle {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.75rem;
+      background: rgba(0,0,0,0.05);
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.3s;
+    }
+    .widget-toggle:hover {
+      background: rgba(0,0,0,0.1);
+    }
+    .widget-toggle input {
+      cursor: pointer;
+    }
+    .hidden-widget {
+      display: none !important;
+    }
+    @media (max-width: 640px) {
+      .container {
+        padding: 0 1rem;
+      }
+      .btn-primary, .btn-filter, .btn-whatsapp {
+        font-size: 0.9rem;
+        padding: 0.75rem 1rem;
+      }
+      .card {
+        padding: 1rem;
+      }
+      .modal > div {
+        width: 95%;
+        padding: 1rem;
+      }
+      table {
+        font-size: 0.75rem;
+      }
+      th, td {
+        padding: 4px;
+      }
+    }
+  </style>
+  <script>
+    // Mobile menu functionality
+    document.addEventListener('DOMContentLoaded', () => {
+      const mobileMenuButton = document.getElementById('mobile-menu-button');
+      const closeMenuButton = document.getElementById('close-menu-button');
+      const mobileMenu = document.getElementById('mobile-menu');
+      const menuBackdrop = document.getElementById('menu-backdrop');
+
+      function toggleMenu() {
+        mobileMenu.classList.toggle('show');
+        menuBackdrop.classList.toggle('show');
+        document.body.classList.toggle('overflow-hidden');
+      }
+
+      mobileMenuButton.addEventListener('click', toggleMenu);
+      closeMenuButton.addEventListener('click', toggleMenu);
+      menuBackdrop.addEventListener('click', toggleMenu);
+    });
+  </script>
+</head>
+<body class="min-h-screen">
+  <!-- Menu Mobile Styles -->
+  <style>
+    .mobile-menu {
+      transform: translateX(-100%);
+      transition: transform 0.3s ease-in-out;
+    }
+    .mobile-menu.show {
+      transform: translateX(0);
+    }
+    .menu-backdrop {
+      transition: opacity 0.3s ease-in-out;
+      opacity: 0;
+      pointer-events: none;
+    }
+    .menu-backdrop.show {
+      opacity: 1;
+      pointer-events: auto;
+    }
+  </style>
+
+  <nav class="gradient-header p-4 shadow-md fixed w-full top-0 z-30">
+    <div class="max-w-7xl mx-auto flex justify-between items-center">
+      <h1 class="text-white text-xl sm:text-2xl font-bold flex items-center gap-2">
+        <i class="fas fa-globe"></i> Ondeline
+      </h1>
+
+      <!-- Menu Mobile Button -->
+      <button id="mobile-menu-button" class="lg:hidden text-white focus:outline-none">
+        <i class="fas fa-bars text-2xl"></i>
+      </button>
+
+      <!-- Desktop Menu -->
+      <div class="hidden lg:flex space-x-6 items-center">
+        <a href="/system/dashboard.html" class="nav-link text-white hover:text-gray-200 font-medium">Dashboard</a>
+        <a href="/system/index.html" class="nav-link text-white hover:text-gray-200 font-medium">Cadastro</a>
+        <a href="/system/clients.html" class="nav-link text-white hover:text-gray-200 font-medium">Clientes</a>
+        <a href="/system/stock.html" class="nav-link text-white hover:text-gray-200 font-medium">Estoque</a>
+        <a href="/system/barcode.html" class="nav-link text-white hover:text-gray-200 font-medium">Leitor</a>
+        <a href="/system/rede.html" class="nav-link text-white hover:text-gray-200 font-medium">Rede</a>
+        <a href="/system/plans.html" class="nav-link text-white hover:text-gray-200 font-medium">Planos</a>
+        <a href="/system/installers.html" class="nav-link text-white hover:text-gray-200 font-medium">Instaladores</a>
+        <button onclick="logout()" class="bg-red-600 text-white p-2 rounded-lg hover:bg-red-700 flex items-center gap-2">
+          <i class="fas fa-sign-out-alt"></i> Sair
+        </button>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Mobile Menu Overlay -->
+  <div id="menu-backdrop" class="menu-backdrop fixed inset-0 bg-black/50 z-40 lg:hidden"></div>
+
+  <!-- Mobile Menu -->
+  <div id="mobile-menu" class="mobile-menu fixed left-0 top-0 h-full w-4/5 max-w-sm bg-white dark:bg-gray-800 z-50 lg:hidden overflow-y-auto">
+    <div class="p-4 border-b border-gray-200 dark:border-gray-700">
+      <div class="flex items-center justify-between">
+        <h2 class="text-xl font-semibold text-gray-800 dark:text-white">Menu</h2>
+        <button id="close-menu-button" class="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">
+          <i class="fas fa-times text-2xl"></i>
+        </button>
+      </div>
+    </div>
+    <nav class="p-4">
+      <ul class="space-y-4">
+        <li>
+          <a href="/system/dashboard.html" class="flex items-center gap-3 text-gray-700 dark:text-gray-200 hover:text-blue-600 dark:hover:text-blue-400 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700">
+            <i class="fas fa-chart-line w-5"></i>
+            <span>Dashboard</span>
+          </a>
+        </li>
+        <li>
+          <a href="/system/index.html" class="flex items-center gap-3 text-gray-700 dark:text-gray-200 hover:text-blue-600 dark:hover:text-blue-400 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700">
+            <i class="fas fa-plus-circle w-5"></i>
+            <span>Cadastro</span>
+          </a>
+        </li>
+        <li>
+          <a href="/system/clients.html" class="flex items-center gap-3 text-gray-700 dark:text-gray-200 hover:text-blue-600 dark:hover:text-blue-400 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700">
+            <i class="fas fa-users w-5"></i>
+            <span>Clientes</span>
+          </a>
+        </li>
+        <li>
+          <a href="/system/stock.html" class="flex items-center gap-3 text-gray-700 dark:text-gray-200 hover:text-blue-600 dark:hover:text-blue-400 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700">
+            <i class="fas fa-box w-5"></i>
+            <span>Estoque</span>
+          </a>
+        </li>
+        <li>
+          <a href="/system/barcode.html" class="flex items-center gap-3 text-gray-700 dark:text-gray-200 hover:text-blue-600 dark:hover:text-blue-400 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700">
+            <i class="fas fa-barcode w-5"></i>
+            <span>Leitor</span>
+          </a>
+        </li>
+        <li>
+          <a href="/system/rede.html" class="flex items-center gap-3 text-gray-700 dark:text-gray-200 hover:text-blue-600 dark:hover:text-blue-400 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700">
+            <i class="fas fa-network-wired w-5"></i>
+            <span>Rede</span>
+          </a>
+        </li>
+        <li>
+          <a href="/system/plans.html" class="flex items-center gap-3 text-gray-700 dark:text-gray-200 hover:text-blue-600 dark:hover:text-blue-400 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700">
+            <i class="fas fa-list-alt w-5"></i>
+            <span>Planos</span>
+          </a>
+        </li>
+        <li>
+          <a href="/system/installers.html" class="flex items-center gap-3 text-gray-700 dark:text-gray-200 hover:text-blue-600 dark:hover:text-blue-400 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700">
+            <i class="fas fa-hard-hat w-5"></i>
+            <span>Instaladores</span>
+          </a>
+        </li>
+        <li>
+          <button onclick="logout()" class="flex items-center gap-3 text-white bg-red-600 hover:bg-red-700 p-2 rounded-lg mt-4 w-full">
+            <i class="fas fa-sign-out-alt w-5"></i>
+            <span>Sair</span>
+          </button>
+        </li>
+      </ul>
+    </nav>
+  </div>
+
+  <div class="mt-20 max-w-7xl mx-auto p-4 sm:p-6 container">
+    <div class="mb-8 text-center">
+      <div class="text-5xl mb-4 text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-purple-600">
+        <i class="fas fa-chart-line"></i>
+      </div>
+      <h2 class="text-2xl font-bold text-gray-800 mb-2">Dashboard do Provedor</h2>
+      <p class="text-gray-600">Acompanhe suas métricas e indicadores em tempo real</p>
+      <div class="mt-4 flex justify-center gap-3">
+        <button id="btn-refresh-dashboard" class="btn-filter bg-blue-600 text-white p-2 rounded-lg hover:bg-blue-700"><i class="fas fa-rotate"></i> Atualizar Dados</button>
+        <button id="btn-customize-dashboard" class="btn-filter bg-purple-600 text-white p-2 rounded-lg hover:bg-purple-700"><i class="fas fa-sliders-h"></i> Personalizar</button>
+        <a href="/system/rede.html" class="btn-primary text-white p-2 rounded-lg hover:bg-indigo-700"><i class="fas fa-network-wired"></i> Página de Rede</a>
+      </div>
+    </div>
+
+    <!-- Métricas Principais -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+      <div class="card metric-card p-6 relative">
+        <div class="flex items-center justify-between">
+          <div>
+            <h3 class="text-lg font-semibold text-gray-800 mb-2">Total de Clientes</h3>
+            <p id="totalClients" class="metric-value">0</p>
+            <p class="text-sm text-gray-500 mt-1">Todos os clientes cadastrados</p>
+          </div>
+          <div class="bg-gradient-to-br from-blue-500/10 to-purple-500/10 p-4 rounded-full">
+            <i class="fas fa-users text-blue-600 text-4xl"></i>
+          </div>
+        </div>
+      </div>
+      <div class="card p-6">
+        <div class="flex items-center justify-between">
+          <div>
+            <h3 class="text-lg font-semibold text-gray-800">Clientes Ativos</h3>
+            <p id="activeClients" class="text-3xl font-bold text-green-600">0</p>
+          </div>
+          <i class="fas fa-user-check text-green-600 text-4xl"></i>
+        </div>
+      </div>
+      <div class="card p-6">
+        <div class="flex items-center justify-between">
+          <div>
+            <h3 class="text-lg font-semibold text-gray-800">Clientes Inadimplentes</h3>
+            <p id="overdueClients" class="text-3xl font-bold text-red-600">0</p>
+          </div>
+          <i class="fas fa-user-times text-red-600 text-4xl"></i>
+        </div>
+      </div>
+      <div class="card p-6">
+        <div class="flex items-center justify-between">
+          <div>
+            <h3 class="text-lg font-semibold text-gray-800">Vencimentos Hoje</h3>
+            <p id="dueToday" class="text-3xl font-bold text-orange-600">0</p>
+          </div>
+          <i class="fas fa-calendar-alt text-orange-600 text-4xl"></i>
+        </div>
+      </div>
+      <div class="card p-6">
+        <div class="flex items-center justify-between">
+          <div>
+            <h3 class="text-lg font-semibold text-gray-800">Vencimentos 7 Dias</h3>
+            <p id="dueWeek" class="text-3xl font-bold text-yellow-600">0</p>
+          </div>
+          <i class="fas fa-calendar-week text-yellow-600 text-4xl"></i>
+        </div>
+      </div>
+      <div class="card p-6">
+        <div class="flex items-center justify-between">
+          <div>
+            <h3 class="text-lg font-semibold text-gray-800">Planos Ativos</h3>
+            <p id="activePlans" class="text-3xl font-bold text-purple-600">0</p>
+          </div>
+          <i class="fas fa-box text-purple-600 text-4xl"></i>
+        </div>
+      </div>
+      <div class="card p-6">
+        <div class="flex items-center justify-between">
+          <div>
+            <h3 class="text-lg font-semibold text-gray-800">Instaladores</h3>
+            <p id="totalInstallers" class="text-3xl font-bold text-indigo-600">0</p>
+          </div>
+          <i class="fas fa-user-cog text-indigo-600 text-4xl"></i>
+        </div>
+      </div>
+      <div class="card p-6">
+        <div class="flex items-center justify-between">
+          <div>
+            <h3 class="text-lg font-semibold text-gray-800">Novos Clientes (Mês)</h3>
+            <p id="newClientsMonth" class="text-3xl font-bold text-teal-600">0</p>
+          </div>
+          <i class="fas fa-user-plus text-teal-600 text-4xl"></i>
+        </div>
+      </div>
+    </div>
+
+    <!-- Painel de Personalização (Inicialmente Oculto) -->
+    <div id="customizePanel" class="customize-panel hidden">
+      <h2 class="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
+        <i class="fas fa-sliders-h"></i> Personalizar Dashboard
+      </h2>
+      
+      <!-- Temas -->
+      <div class="mb-6">
+        <h3 class="text-lg font-semibold text-gray-800 mb-3">Escolha um Tema</h3>
+        <div class="theme-toggle">
+          <button class="theme-btn active" data-theme="default" onclick="changeTheme('default')">
+            <i class="fas fa-circle"></i> Padrão
+          </button>
+          <button class="theme-btn" data-theme="dark" onclick="changeTheme('dark')">
+            <i class="fas fa-moon"></i> Escuro
+          </button>
+          <button class="theme-btn" data-theme="light" onclick="changeTheme('light')">
+            <i class="fas fa-sun"></i> Claro
+          </button>
+          <button class="theme-btn" data-theme="ocean" onclick="changeTheme('ocean')">
+            <i class="fas fa-water"></i> Oceano
+          </button>
+        </div>
+      </div>
+
+      <!-- Widgets Visíveis/Ocultos -->
+      <div class="mb-6">
+        <h3 class="text-lg font-semibold text-gray-800 mb-3">Gerenciar Widgets</h3>
+        <p class="text-sm text-gray-600 mb-3">Selecione quais widgets deseja exibir:</p>
+        <div class="widget-list">
+          <label class="widget-toggle">
+            <input type="checkbox" class="widget-visibility" data-widget="metrics" checked>
+            <span>Métricas</span>
+          </label>
+          <label class="widget-toggle">
+            <input type="checkbox" class="widget-visibility" data-widget="map" checked>
+            <span>Mapa</span>
+          </label>
+          <label class="widget-toggle">
+            <input type="checkbox" class="widget-visibility" data-widget="charts" checked>
+            <span>Gráficos</span>
+          </label>
+          <label class="widget-toggle">
+            <input type="checkbox" class="widget-visibility" data-widget="table" checked>
+            <span>Tabela</span>
+          </label>
+        </div>
+      </div>
+
+      <!-- Botões -->
+      <div class="flex gap-3">
+        <button onclick="saveDashboardLayout()" class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 flex items-center gap-2">
+          <i class="fas fa-save"></i> Salvar Configurações
+        </button>
+        <button onclick="closCustomizePanel()" class="bg-gray-400 text-white px-4 py-2 rounded-lg hover:bg-gray-500 flex items-center gap-2">
+          <i class="fas fa-times"></i> Fechar
+        </button>
+      </div>
+    </div>
+
+    <!-- Widget de Mapa -->
+    <div id="mapWidget" class="widget card mb-6 p-6">
+      <div class="widget-header">
+        <h2 class="text-lg font-bold text-gray-800 flex items-center gap-2">
+          <i class="fas fa-map-location-dot text-blue-600"></i> Distribuição de Clientes
+        </h2>
+        <div class="widget-controls">
+          <button class="widget-btn" title="Minimizar" onclick="toggleWidget(this)">
+            <i class="fas fa-minus"></i>
+          </button>
+          <button class="widget-btn" title="Fechar" onclick="hideWidget('mapWidget')">
+            <i class="fas fa-times"></i>
+          </button>
+        </div>
+      </div>
+      <p class="text-sm text-gray-600 mb-3">Visualize a distribuição geográfica de seus clientes</p>
+      <div id="mapContainer"></div>
+      <div class="mt-3 text-xs text-gray-500">
+        <i class="fas fa-info-circle"></i> 
+        <span id="mapStats">Carregando mapa...</span>
+      </div>
+      <button onclick="initializeMap()" class="mt-3 bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700">
+        <i class="fas fa-redo"></i> Recarregar Mapa
+      </button>
+    </div>
+
+    <!-- Gráficos -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+      <div class="card p-6">
+        <h3 class="text-lg font-semibold text-gray-800 mb-4">Clientes por Cidade</h3>
+        <canvas id="cityChart" height="200"></canvas>
+      </div>
+      <div class="card p-6">
+        <h3 class="text-lg font-semibold text-gray-800 mb-4">Clientes por Plano</h3>
+        <canvas id="planChart" height="200"></canvas>
+      </div>
+      <div class="card p-6">
+        <h3 class="text-lg font-semibold text-gray-800 mb-4">Crescimento de Clientes</h3>
+        <canvas id="growthChart" height="200"></canvas>
+      </div>
+      <div class="card p-6">
+        <h3 class="text-lg font-semibold text-gray-800 mb-4">Status dos Clientes</h3>
+        <canvas id="statusChart" height="200"></canvas>
+      </div>
+    </div>
+
+    <!-- Tabela de Vencimentos Próximos -->
+    <div class="card p-6">
+      <h3 class="text-lg font-semibold text-gray-800 mb-4">Vencimentos Próximos (7 Dias)</h3>
+      <div class="mb-4">
+        <form id="filterForm" class="grid grid-cols-1 sm:grid-cols-4 gap-4">
+          <div class="input-icon relative">
+            <select id="filterCity" class="p-3 border rounded-lg focus:outline-none bg-gray-50 w-full pl-10">
+              <option value="">Todas as Cidades</option>
+              <option value="Ipixuna">Ipixuna</option>
+              <option value="Eirunepé">Eirunepé</option>
+              <option value="Carauari">Carauari</option>
+              <option value="Itamarati">Itamarati</option>
+            </select>
+            <i class="fas fa-map-marker-alt absolute left-3 top-3 text-gray-400"></i>
+          </div>
+          <div class="input-icon relative">
+            <select id="filterPlan" class="p-3 border rounded-lg focus:outline-none bg-gray-50 w-full pl-10">
+              <option value="">Todos os Planos</option>
+            </select>
+            <i class="fas fa-box absolute left-3 top-3 text-gray-400"></i>
+          </div>
+          <div class="input-icon relative">
+            <select id="filterInstaller" class="p-3 border rounded-lg focus:outline-none bg-gray-50 w-full pl-10">
+              <option value="">Todos os Instaladores</option>
+            </select>
+            <i class="fas fa-user-cog absolute left-3 top-3 text-gray-400"></i>
+          </div>
+          <button type="button" onclick="applyFilters()" class="btn-filter bg-blue-600 text-white p-3 rounded-lg hover:bg-blue-700">
+            <i class="fas fa-filter"></i> Filtrar
+          </button>
+        </form>
+      </div>
+      <div class="table-container">
+        <table>
+          <thead>
+            <tr>
+              <th>Nome</th>
+              <th>CPF</th>
+              <th>Plano</th>
+              <th>Cidade</th>
+              <th>Instalador</th>
+              <th>Vencimento</th>
+              <th>Ação</th>
+            </tr>
+          </thead>
+          <tbody id="upcomingDueTable"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div id="modal" class="modal fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden">
+    <div class="bg-white p-6 rounded-lg shadow-xl max-w-md w-full sm:w-3/4">
+      <h3 id="modalTitle" class="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2"></h3>
+      <p id="modalMessage" class="text-gray-600 mb-6"></p>
+      <button onclick="closeModal()" class="bg-blue-600 text-white p-2 rounded-lg hover:bg-blue-700 w-full flex items-center justify-center gap-2">
+        <i class="fas fa-check"></i> OK
+      </button>
+    </div>
+  </div>
+
+  <script>
+    let charts = {};
+
+    async function checkAuth() {
+      try {
+        const response = await fetch('/system/api/check_auth.php');
+        if (!response.ok) {
+          throw new Error(`Erro HTTP ${response.status}: ${response.statusText}`);
+        }
+        const result = await response.json();
+        if (!result.authenticated) {
+          showModal('Não Autenticado', 'Por favor, faça login para acessar o dashboard.', 'fas fa-exclamation-triangle text-red-600');
+          setTimeout(() => window.location.href = '/system/login.html', 2000);
+          return;
+        }
+        loadDashboard();
+        loadFilters();
+      } catch (error) {
+        showModal('Erro', `Erro ao verificar autenticação: ${error.message}`, 'fas fa-exclamation-triangle text-red-600');
+        setTimeout(() => window.location.href = '/system/login.html', 2000);
+      }
+    }
+
+    async function logout() {
+      try {
+        const response = await fetch('/system/api/logout.php', { method: 'POST' });
+        if (!response.ok) throw new Error(`Erro HTTP ${response.status}: ${response.statusText}`);
+        window.location.href = '/system/login.html';
+      } catch (error) {
+        showModal('Erro', `Erro ao fazer logout: ${error.message}`, 'fas fa-exclamation-triangle text-red-600');
+      }
+    }
+
+    function showModal(title, message, iconClass = 'fas fa-info-circle text-blue-600') {
+      document.getElementById('modalTitle').innerHTML = `<i class="${iconClass}"></i> ${title}`;
+      document.getElementById('modalMessage').textContent = message;
+      const modal = document.getElementById('modal');
+      modal.classList.remove('hidden');
+      modal.classList.add('show');
+      setTimeout(() => modal.classList.add('show'), 10);
+    }
+
+    function closeModal() {
+      const modal = document.getElementById('modal');
+      modal.classList.remove('show');
+      setTimeout(() => modal.classList.add('hidden'), 300);
+    }
+
+    function formatCPF(cpf) {
+      if (!cpf) return '';
+      cpf = cpf.replace(/\D/g, '');
+      return cpf.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
+    }
+
+    async function loadFilters() {
+      try {
+        const [plansResponse, installersResponse] = await Promise.all([
+          fetch('/system/api/plans.php'),
+          fetch('/system/api/installers.php')
+        ]);
+        if (!plansResponse.ok) throw new Error(`Erro ao carregar planos: ${plansResponse.statusText}`);
+        if (!installersResponse.ok) throw new Error(`Erro ao carregar instaladores: ${installersResponse.statusText}`);
+        const plans = await plansResponse.json();
+        const installers = await installersResponse.json();
+
+        const planSelect = document.getElementById('filterPlan');
+        plans.forEach(plan => {
+          const option = document.createElement('option');
+          option.value = plan.id;
+          option.textContent = `${plan.name} - R$ ${parseFloat(plan.price).toFixed(2)}`;
+          planSelect.appendChild(option);
+        });
+
+        const installerSelect = document.getElementById('filterInstaller');
+        installers.forEach(installer => {
+          const option = document.createElement('option');
+          option.value = installer.name;
+          option.textContent = installer.name;
+          installerSelect.appendChild(option);
+        });
+      } catch (error) {
+        showModal('Erro', `Erro ao carregar filtros: ${error.message}`, 'fas fa-exclamation-triangle text-red-600');
+      }
+    }
+
+    async function loadDashboard() {
+      try {
+        const response = await fetch('/system/api/dashboard.php');
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(`Erro HTTP ${response.status}: ${errorText || response.statusText}`);
+        }
+        const data = await response.json();
+        if (data.error) {
+          throw new Error(data.error);
+        }
+
+        // Atualizar métricas
+        document.getElementById('totalClients').textContent = data.totalClients || 0;
+        document.getElementById('activeClients').textContent = data.activeClients || 0;
+        document.getElementById('overdueClients').textContent = data.overdueClients || 0;
+        document.getElementById('dueToday').textContent = data.dueToday || 0;
+        document.getElementById('dueWeek').textContent = data.dueWeek || 0;
+        document.getElementById('activePlans').textContent = data.activePlans || 0;
+        document.getElementById('totalInstallers').textContent = data.totalInstallers || 0;
+        document.getElementById('newClientsMonth').textContent = data.newClientsMonth || 0;
+
+        // Gráfico: Clientes por Cidade
+        if (charts.city) charts.city.destroy();
+        const cityCtx = document.getElementById('cityChart').getContext('2d');
+        charts.city = new Chart(cityCtx, {
+          type: 'doughnut',
+          data: {
+            labels: data.clientsByCity?.length ? data.clientsByCity.map(item => item.city || 'Não informado') : ['Sem dados'],
+            datasets: [{
+              data: data.clientsByCity?.length ? data.clientsByCity.map(item => item.count) : [0],
+              backgroundColor: ['#1e3a8a', '#3b82f6', '#60a5fa', '#93c5fd', '#bfdbfe'],
+              borderWidth: 0
+            }]
+          },
+          options: {
+            responsive: true,
+            plugins: {
+              legend: { position: 'bottom' },
+              tooltip: { callbacks: { label: ctx => `${ctx.label}: ${ctx.raw} clientes` } }
+            }
+          }
+        });
+
+        // Gráfico: Clientes por Plano
+        if (charts.plan) charts.plan.destroy();
+        const planCtx = document.getElementById('planChart').getContext('2d');
+        charts.plan = new Chart(planCtx, {
+          type: 'pie',
+          data: {
+            labels: data.clientsByPlan?.length ? data.clientsByPlan.map(item => item.plan_name || 'Não informado') : ['Sem dados'],
+            datasets: [{
+              data: data.clientsByPlan?.length ? data.clientsByPlan.map(item => item.count) : [0],
+              backgroundColor: ['#10b981', '#059669', '#047857', '#065f46'],
+              borderWidth: 0
+            }]
+          },
+          options: {
+            responsive: true,
+            plugins: {
+              legend: { position: 'bottom' },
+              tooltip: { callbacks: { label: ctx => `${ctx.label}: ${ctx.raw} clientes` } }
+            }
+          }
+        });
+
+        // Gráfico: Crescimento de Clientes
+        if (charts.growth) charts.growth.destroy();
+        const growthCtx = document.getElementById('growthChart').getContext('2d');
+        charts.growth = new Chart(growthCtx, {
+          type: 'line',
+          data: {
+            labels: data.clientGrowth?.length ? data.clientGrowth.map(item => item.month) : ['Sem dados'],
+            datasets: [{
+              label: 'Novos Clientes',
+              data: data.clientGrowth?.length ? data.clientGrowth.map(item => item.count) : [0],
+              borderColor: '#3b82f6',
+              backgroundColor: 'rgba(59, 130, 246, 0.1)',
+              fill: true,
+              tension: 0.4
+            }]
+          },
+          options: {
+            responsive: true,
+            scales: {
+              y: { beginAtZero: true, ticks: { stepSize: 1 } },
+              x: { grid: { display: false } }
+            },
+            plugins: {
+              legend: { display: false },
+              tooltip: { callbacks: { label: ctx => `Novos: ${ctx.raw} clientes` } }
+            }
+          }
+        });
+
+        // Gráfico: Status dos Clientes
+        if (charts.status) charts.status.destroy();
+        const statusCtx = document.getElementById('statusChart').getContext('2d');
+        charts.status = new Chart(statusCtx, {
+          type: 'bar',
+          data: {
+            labels: ['Ativos', 'Inadimplentes'],
+            datasets: [{
+              label: 'Clientes',
+              data: [data.activeClients || 0, data.overdueClients || 0],
+              backgroundColor: ['#10b981', '#ef4444'],
+              borderWidth: 0
+            }]
+          },
+          options: {
+            responsive: true,
+            scales: {
+              y: { beginAtZero: true, ticks: { stepSize: 1 } },
+              x: { grid: { display: false } }
+            },
+            plugins: {
+              legend: { display: false },
+              tooltip: { callbacks: { label: ctx => `${ctx.label}: ${ctx.raw} clientes` } }
+            }
+          }
+        });
+
+        // Tabela de Vencimentos Próximos
+        renderDueTable(data.upcomingDue || []);
+        
+        // Disparar evento para inicializar mapa
+        window.dispatchEvent(new Event('dashboardLoaded'));
+      } catch (error) {
+        showModal('Erro', `Erro ao carregar dashboard: ${error.message}`, 'fas fa-exclamation-triangle text-red-600');
+      }
+    }
+
+    async function sendWhatsAppReminder(phoneNumber, clientName, dueDay, planName) {
+      if (!phoneNumber) {
+        showModal('Erro', 'Número de telefone não disponível para este cliente.', 'fas fa-exclamation-triangle text-red-600');
+        return;
+      }
+      const message = `Olá, ${clientName}! Lembrete: seu pagamento do plano ${planName} vence no dia ${dueDay}. Por favor, regularize para evitar interrupções.`;
+      try {
+        const response = await fetch('/system/api/whatsapp.php', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ to: phoneNumber, message })
+        });
+        if (!response.ok) throw new Error(`Erro HTTP ${response.status}: ${await response.text()}`);
+        const result = await response.json();
+        if (result.error) throw new Error(result.error);
+        showModal('Sucesso', 'Lembrete enviado com sucesso via WhatsApp!', 'fas fa-check-circle text-green-600');
+      } catch (error) {
+        showModal('Erro', `Erro ao enviar lembrete: ${error.message}`, 'fas fa-exclamation-triangle text-red-600');
+      }
+    }
+
+    function renderDueTable(clients) {
+      const tbody = document.getElementById('upcomingDueTable');
+      tbody.innerHTML = '';
+      if (!clients || clients.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" class="text-center text-gray-600">Nenhum vencimento próximo.</td></tr>';
+      } else {
+        clients.forEach(client => {
+          const tr = document.createElement('tr');
+          tr.innerHTML = `
+            <td>${client.name || ''}</td>
+            <td>${formatCPF(client.cpf)}</td>
+            <td>${client.plan_name || ''}</td>
+            <td>${client.city || ''}</td>
+            <td>${client.installer || ''}</td>
+            <td>${client.dueDay || ''}</td>
+            <td>
+              <button onclick="sendWhatsAppReminder('${client.phone_number}', '${client.name}', '${client.dueDay}', '${client.plan_name}')" class="btn-whatsapp bg-green-600 text-white p-2 rounded-lg hover:bg-green-700">
+                <i class="fab fa-whatsapp"></i> Enviar Lembrete
+              </button>
+            </td>
+          `;
+          tbody.appendChild(tr);
+        });
+      }
+    }
+
+    async function applyFilters() {
+      const city = document.getElementById('filterCity').value;
+      const plan = document.getElementById('filterPlan').value;
+      const installer = document.getElementById('filterInstaller').value;
+      try {
+        const response = await fetch(`/system/api/dashboard.php?filterCity=${encodeURIComponent(city)}&filterPlan=${encodeURIComponent(plan)}&filterInstaller=${encodeURIComponent(installer)}`);
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(`Erro HTTP ${response.status}: ${errorText || response.statusText}`);
+        }
+        const data = await response.json();
+        if (data.error) {
+          throw new Error(data.error);
+        }
+        renderDueTable(data.upcomingDue || []);
+      } catch (error) {
+        showModal('Erro', `Erro ao aplicar filtros: ${error.message}`, 'fas fa-exclamation-triangle text-red-600');
+      }
+    }
+
+    function initMobileMenu() {
+      const mobileMenuButton = document.getElementById('mobile-menu-button');
+      const closeMenuButton = document.getElementById('close-menu-button');
+      const mobileMenu = document.getElementById('mobile-menu');
+      const menuBackdrop = document.getElementById('menu-backdrop');
+
+      function openMenu() {
+        mobileMenu.classList.add('show');
+        menuBackdrop.classList.add('show');
+        document.body.style.overflow = 'hidden';
+      }
+
+      function closeMenu() {
+        mobileMenu.classList.remove('show');
+        menuBackdrop.classList.remove('show');
+        document.body.style.overflow = '';
+      }
+
+      mobileMenuButton.addEventListener('click', openMenu);
+      closeMenuButton.addEventListener('click', closeMenu);
+      menuBackdrop.addEventListener('click', closeMenu);
+
+      // Fechar menu ao clicar em um link
+      const mobileMenuLinks = mobileMenu.getElementsByTagName('a');
+      Array.from(mobileMenuLinks).forEach(link => {
+        link.addEventListener('click', closeMenu);
+      });
+
+      // Fechar menu ao redimensionar para desktop
+      window.addEventListener('resize', () => {
+        if (window.innerWidth >= 1024) {
+          closeMenu();
+        }
+      });
+    }
+
+    window.onload = function() {
+      checkAuth();
+      initMobileMenu();
+    };
+
+    // Refresh button and event listeners
+    document.addEventListener('DOMContentLoaded', () => {
+      const refBtn = document.getElementById('btn-refresh-dashboard');
+      if (refBtn) refBtn.addEventListener('click', loadDashboard);
+      
+      const customizeBtn = document.getElementById('btn-customize-dashboard');
+      if (customizeBtn) customizeBtn.addEventListener('click', openCustomizePanel);
+      
+      const closeCustomizeBtn = document.getElementById('btn-close-customize');
+      if (closeCustomizeBtn) closeCustomizeBtn.addEventListener('click', closCustomizePanel);
+      
+      const saveCustomizeBtn = document.getElementById('btn-save-customize');
+      if (saveCustomizeBtn) {
+        saveCustomizeBtn.addEventListener('click', () => {
+          saveDashboardLayout();
+        });
+      }
+      
+      // Theme buttons
+      document.querySelectorAll('.theme-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          const theme = e.target.getAttribute('data-theme');
+          if (theme) changeTheme(theme);
+        });
+      });
+      
+      // Widget visibility checkboxes
+      document.querySelectorAll('.widget-visibility').forEach(checkbox => {
+        checkbox.addEventListener('change', (e) => {
+          const widget = e.target.getAttribute('data-widget');
+          applyWidgetVisibility(widget, e.target.checked);
+        });
+      });
+      
+      // Carregar layout salvo
+      loadDashboardLayout();
+    });
+
+    // ============ FUNCIONALIDADES DE MAPA ============
+    window.mapInstance = null;
+    const cityCoordinates = {
+      'Ipixuna': [-7.6333, -71.8167],
+      'Eirunepé': [-6.6667, -69.8333],
+      'Carauari': [-4.8833, -66.8833],
+      'Itamarati': [-5.1833, -67.9667],
+      'Envira': [-6.6333, -69.5167],
+      'Guajará': [-6.8167, -69.3333],
+      'Jordão': [-8.1333, -71.3667],
+      'Marechal Thaumaturgo': [-9.0167, -70.4333],
+      'Santa Rosa do Purus': [-8.7667, -70.7333],
+      'Sena Madureira': [-9.0333, -68.6667]
+    };
+
+    async function initializeMap() {
+      try {
+        console.log('Iniciando mapa...');
+        
+        // Aguardar Leaflet carregar com retry
+        let retries = 0;
+        while (typeof L === 'undefined' && retries < 10) {
+          console.log(`Aguardando Leaflet... tentativa ${retries + 1}`);
+          await new Promise(resolve => setTimeout(resolve, 500));
+          retries++;
+        }
+        
+        if (typeof L === 'undefined') {
+          throw new Error('Leaflet não carregou após 10 tentativas (5 segundos)');
+        }
+        
+        console.log('Leaflet carregado com sucesso!');
+        
+        // Verificar se o container existe
+        const container = document.getElementById('mapContainer');
+        if (!container) {
+          console.error('Container do mapa não encontrado!');
+          return;
+        }
+        
+        console.log('Container encontrado, dimensões:', container.offsetWidth, 'x', container.offsetHeight);
+        
+        // Esperar pela API de clientes (com credentials para enviar cookies)
+        const response = await fetch('/system/api/clients.php', {
+          method: 'GET',
+          credentials: 'include',
+          headers: { 'Accept': 'application/json' }
+        });
+        if (!response.ok) {
+          throw new Error(`Erro HTTP ${response.status}`);
+        }
+        const result = await response.json();
+        
+        console.log('Resposta da API:', result);
+        
+        // Extrair array de clientes - a API retorna {success: true, data: [...]}
+        let clients = [];
+        if (result.success && Array.isArray(result.data)) {
+          clients = result.data;
+        } else if (Array.isArray(result)) {
+          clients = result;
+        } else {
+          console.error('Resposta da API em formato inesperado:', result);
+          throw new Error('Formato de resposta da API inválido');
+        }
+        
+        console.log('Clientes extraídos:', clients);
+        
+        // Calcular centro do mapa
+        const amazonasCenter = [-6.8, -69.5];
+        
+        // Destruir mapa anterior se existir
+        if (window.mapInstance) {
+          window.mapInstance.remove();
+        }
+        
+        // Criar mapa
+        console.log('Criando mapa Leaflet...');
+        window.mapInstance = L.map('mapContainer').setView(amazonasCenter, 6);
+        
+        // Adicionar tiles
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          attribution: '© OpenStreetMap contributors',
+          maxZoom: 19
+        }).addTo(window.mapInstance);
+        
+        console.log('Mapa criado com sucesso');
+
+        // Agrupar clientes por cidade
+        const clientsByCity = {};
+        clients.forEach(client => {
+          const city = client.city || 'Não informado';
+          if (!clientsByCity[city]) clientsByCity[city] = [];
+          clientsByCity[city].push(client);
+        });
+
+        // Adicionar marcadores
+        Object.entries(clientsByCity).forEach(([city, cityclients]) => {
+          const coords = cityCoordinates[city] || amazonasCenter;
+          const count = cityclients.length;
+          
+          // Escolher cor baseado na quantidade
+          let color = '#3b82f6'; // azul
+          if (count > 50) color = '#dc2626'; // vermelho
+          else if (count > 30) color = '#f59e0b'; // laranja
+          else if (count > 10) color = '#10b981'; // verde
+          
+          const icon = L.divIcon({
+            className: 'custom-marker',
+            html: `<div style="background-color: ${color}; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; box-shadow: 0 2px 8px rgba(0,0,0,0.3); border: 3px solid white;">
+              ${count}
+            </div>`,
+            iconSize: [40, 40],
+            iconAnchor: [20, 20]
+          });
+
+          const marker = L.marker(coords, { icon }).addTo(window.mapInstance);
+          
+          // Popup com informações
+          const popupContent = `
+            <div style="font-family: Poppins; min-width: 200px;">
+              <h4 style="font-weight: bold; margin-bottom: 8px; color: #1e3a8a;">${city}</h4>
+              <p style="margin: 4px 0; color: #666;">
+                <i class="fas fa-users"></i> <strong>${count}</strong> clientes
+              </p>
+              <p style="margin: 4px 0; color: #666;">
+                <i class="fas fa-check-circle"></i> 
+                <strong>${cityclients.filter(c => c.status === 'ativo').length}</strong> ativos
+              </p>
+              <p style="margin: 4px 0; color: #666;">
+                <i class="fas fa-times-circle"></i> 
+                <strong>${cityclients.filter(c => c.status !== 'ativo').length}</strong> inativos
+              </p>
+            </div>
+          `;
+          marker.bindPopup(popupContent);
+        });
+
+        // Atualizar estatísticas do mapa
+        const totalClients = clients.length;
+        const activeCities = Object.keys(clientsByCity).length;
+        document.getElementById('mapStats').innerHTML = 
+          `<i class="fas fa-info-circle"></i> ${totalClients} clientes em ${activeCities} cidades`;
+        
+        console.log('Mapa inicializado com sucesso!');
+
+      } catch (error) {
+        console.error('Erro ao inicializar mapa:', error.message);
+        console.error('Stack:', error.stack);
+        document.getElementById('mapStats').innerHTML = 
+          `<i class="fas fa-exclamation-triangle"></i> Erro ao carregar mapa: ${error.message}`;
+      }
+    }
+
+    // ============ FUNCIONALIDADES DE PERSONALIZAÇÃO ============
+    function openCustomizePanel() {
+      document.getElementById('customizePanel').classList.remove('hidden');
+    }
+
+    function closCustomizePanel() {
+      document.getElementById('customizePanel').classList.add('hidden');
+    }
+
+    function changeTheme(theme) {
+      const body = document.body;
+      let gradient = '';
+      
+      switch(theme) {
+        case 'dark':
+          gradient = 'linear-gradient(135deg, #1a1a2e 0%, #16213e 100%)';
+          break;
+        case 'light':
+          gradient = 'linear-gradient(135deg, #f5f7fa 0%, #e8ecf1 100%)';
+          break;
+        case 'ocean':
+          gradient = 'linear-gradient(135deg, #0066cc 0%, #00ccff 100%)';
+          break;
+        default:
+          gradient = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
+      }
+      
+      body.style.background = gradient;
+      localStorage.setItem('dashboardTheme', theme);
+      
+      // Atualizar botões
+      document.querySelectorAll('.theme-btn').forEach(btn => {
+        btn.classList.remove('active');
+      });
+      document.querySelector(`[data-theme="${theme}"]`).classList.add('active');
+    }
+
+    function saveDashboardLayout() {
+      const layout = {
+        theme: localStorage.getItem('dashboardTheme') || 'default',
+        widgets: {}
+      };
+
+      // Salvar visibilidade dos widgets
+      document.querySelectorAll('.widget-visibility').forEach(checkbox => {
+        const widgetId = checkbox.getAttribute('data-widget');
+        layout.widgets[widgetId] = checkbox.checked;
+      });
+
+      localStorage.setItem('dashboardLayout', JSON.stringify(layout));
+      showModal('Sucesso', 'Configurações salvas com sucesso!', 'fas fa-check-circle text-green-600');
+      closCustomizePanel();
+    }
+
+    function loadDashboardLayout() {
+      const saved = localStorage.getItem('dashboardLayout');
+      if (!saved) return;
+
+      const layout = JSON.parse(saved);
+      
+      // Restaurar tema
+      if (layout.theme && layout.theme !== 'default') {
+        changeTheme(layout.theme);
+      }
+
+      // Restaurar visibilidade dos widgets
+      Object.entries(layout.widgets).forEach(([widget, visible]) => {
+        const checkbox = document.querySelector(`[data-widget="${widget}"]`);
+        if (checkbox) {
+          checkbox.checked = visible;
+          applyWidgetVisibility(widget, visible);
+        }
+      });
+    }
+
+    function applyWidgetVisibility(widget, visible) {
+      const widgetMap = {
+        'metrics': '[id$="Clients"]',
+        'map': '#mapWidget',
+        'charts': '#cityChart',
+        'table': '#upcomingDueTable'
+      };
+
+      const selector = widgetMap[widget];
+      if (selector) {
+        const elements = document.querySelectorAll(selector);
+        elements.forEach(el => {
+          const container = el.closest('.widget') || el.closest('.grid') || el.closest('.card') || el;
+          if (visible) {
+            container.classList.remove('hidden-widget');
+          } else {
+            container.classList.add('hidden-widget');
+          }
+        });
+      }
+    }
+
+    function toggleWidget(btn) {
+      const widget = btn.closest('.widget');
+      const content = widget.querySelector('[id$="Chart"], #mapContainer, tbody');
+      if (content) {
+        content.parentElement.classList.toggle('hidden');
+        btn.innerHTML = content.parentElement.classList.contains('hidden') 
+          ? '<i class="fas fa-plus"></i>' 
+          : '<i class="fas fa-minus"></i>';
+      }
+    }
+
+    function hideWidget(widgetId) {
+      const widget = document.getElementById(widgetId);
+      if (widget) widget.classList.add('hidden-widget');
+    }
+
+    // Inicializar mapa quando dashboard carregar
+    window.addEventListener('dashboardLoaded', () => {
+      console.log('Evento dashboardLoaded disparado');
+      // Chamar map com retry built-in
+      initializeMap().catch(err => {
+        console.error('Erro ao inicializar mapa:', err.message);
+        document.getElementById('mapStats').innerHTML = 
+          `<i class="fas fa-exclamation-triangle"></i> Erro: ${err.message}`;
+      });
+    });
+    
+    // Backup: inicializar mapa se houver clientes na página
+    document.addEventListener('DOMContentLoaded', () => {
+      console.log('DOMContentLoaded disparado');
+      // O loadDashboard deve disparar dashboardLoaded
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,1281 @@
+<script type="text/javascript">
+        var gk_isXlsx = false;
+        var gk_xlsxFileLookup = {};
+        var gk_fileData = {};
+        function filledCell(cell) {
+          return cell !== '' && cell != null;
+        }
+        function loadFileData(filename) {
+        if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
+            try {
+                var workbook = XLSX.read(gk_fileData[filename], { type: 'base64' });
+                var firstSheetName = workbook.SheetNames[0];
+                var worksheet = workbook.Sheets[firstSheetName];
+
+                // Convert sheet to JSON to filter blank rows
+                var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false, defval: '' });
+                // Filter out blank rows (rows where all cells are empty, null, or undefined)
+                var filteredData = jsonData.filter(row => row.some(filledCell));
+
+                // Heuristic to find the header row by ignoring rows with fewer filled cells than the next row
+                var headerRowIndex = filteredData.findIndex((row, index) =>
+                  row.filter(filledCell).length >= filteredData[index + 1]?.filter(filledCell).length
+                );
+                // Fallback
+                if (headerRowIndex === -1 || headerRowIndex > 25) {
+                  headerRowIndex = 0;
+                }
+
+                // Convert filtered JSON back to CSV
+                var csv = XLSX.utils.aoa_to_sheet(filteredData.slice(headerRowIndex)); // Create a new sheet from filtered array of arrays
+                csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
+                return csv;
+            } catch (e) {
+                console.error(e);
+                return "";
+            }
+        }
+        return gk_fileData[filename] || "";
+        }
+        </script><!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gerenciar Clientes - Sistema ERP</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" integrity="sha512-iecdLmaskl7CVkqkXNQ/ZH/XLlvWZOJyj7Yy7tcenmpD1ypASozpmT/E0iPtmFIB46ZmdtAc9eNBvH0H/ZpiBw==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    body {
+      font-family: 'Poppins', sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+    }
+    .gradient-header {
+      background: rgba(255, 255, 255, 0.1);
+      backdrop-filter: blur(10px);
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    .nav-link {
+      position: relative;
+      transition: color 0.3s ease;
+    }
+    .nav-link::after {
+      content: '';
+      position: absolute;
+      width: 0;
+      height: 3px;
+      bottom: -6px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: linear-gradient(90deg, #fff, rgba(255,255,255,0.5));
+      transition: width 0.3s ease;
+      border-radius: 3px;
+    }
+    .nav-link:hover::after {
+      width: 100%;
+    }
+    .btn-primary, .btn-edit, .btn-delete, .btn-cancel, .btn-clear, .btn-logout, .btn-report {
+      transition: all 0.3s ease;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      font-weight: 600;
+      padding: 0.75rem 1.5rem;
+      font-size: 0.95rem;
+      letter-spacing: 0.5px;
+      border: none;
+      cursor: pointer;
+    }
+    .btn-edit, .btn-report {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    }
+    .btn-delete {
+      background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+    }
+    .btn-logout {
+      background: linear-gradient(135deg, #ef4444 0%, #b91c1c 100%);
+    }
+    .btn-primary:hover, .btn-edit:hover, .btn-delete:hover, .btn-cancel:hover, .btn-clear:hover, .btn-logout:hover, .btn-report:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
+    }
+    .client-card {
+      transition: all 0.3s ease;
+      border-radius: 20px;
+      background: rgba(255, 255, 255, 0.95);
+      animation: fadeIn 0.5s ease-out;
+      animation-delay: calc(var(--index) * 0.1s);
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+    }
+    .client-card:hover {
+      transform: translateY(-5px);
+      box-shadow: 0 15px 35px rgba(0, 0, 0, 0.2);
+    }
+    .client-card strong {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+      font-size: 1.25rem;
+    }
+    .modal {
+      transition: all 0.3s ease-in-out;
+      transform: scale(0.95);
+      backdrop-filter: blur(5px);
+    }
+    .modal.show {
+      transform: scale(1);
+    }
+    .input-icon {
+      position: relative;
+    }
+    .input-icon i {
+      position: absolute;
+      left: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: #6b7280;
+    }
+    .input-icon input, .input-icon select {
+      padding-left: 48px;
+      border-radius: 12px;
+      transition: all 0.3s ease;
+      height: 50px;
+      border: 2px solid transparent;
+      background: rgba(255, 255, 255, 0.9);
+      font-size: 0.95rem;
+      color: #1a1a1a;
+    }
+    .input-icon input:focus, .input-icon select:focus {
+      border-color: #667eea;
+      background: white;
+      box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.1);
+    }
+    .input-icon i {
+      font-size: 1.2rem;
+      transition: color 0.3s ease;
+    }
+    .input-icon input:focus + i, .input-icon select:focus + i {
+      color: #667eea;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    @media (max-width: 640px) {
+      .container {
+        padding: 0 1rem;
+      }
+      input, select {
+        font-size: 0.95rem;
+        padding: 0.75rem 2.5rem;
+      }
+      .btn-primary, .btn-edit, .btn-delete, .btn-cancel, .btn-clear, .btn-logout, .btn-report {
+        font-size: 0.85rem;
+        padding: 0.75rem 1rem;
+      }
+      .client-card {
+        font-size: 0.85rem;
+        padding: 0.75rem;
+      }
+      .modal > div {
+        width: 90%;
+      }
+    }
+    .checkbox-active {
+      width: 1.5rem;
+      height: 1.5rem;
+      cursor: pointer;
+    }
+    /* Estilos do menu mobile */
+    .mobile-menu {
+      transform: translateX(-100%);
+      transition: transform 0.3s ease-in-out;
+    }
+    .mobile-menu.show {
+      transform: translateX(0);
+    }
+    .menu-backdrop {
+      transition: opacity 0.3s ease-in-out;
+      opacity: 0;
+      pointer-events: none;
+    }
+    .menu-backdrop.show {
+      opacity: 1;
+      pointer-events: auto;
+    }
+  </style>
+</head>
+<body class="min-h-screen">
+  <nav class="gradient-header p-4 shadow-md fixed w-full top-0 z-30">
+    <div class="max-w-7xl mx-auto flex justify-between items-center">
+      <h1 class="text-white text-xl sm:text-2xl font-bold flex items-center gap-2">
+        <i class="fas fa-cogs"></i> Sistema ERP
+      </h1>
+
+      <!-- Menu Mobile Button -->
+      <button id="mobile-menu-button" class="lg:hidden text-white focus:outline-none">
+        <i class="fas fa-bars text-2xl"></i>
+      </button>
+
+      <!-- Desktop Menu -->
+      <div class="hidden lg:flex space-x-6 items-center">
+        <a href="/system/dashboard.html" class="nav-link text-white hover:text-gray-200 font-medium">Dashboard</a>
+        <a href="/system/index.html" class="nav-link text-white hover:text-gray-200 font-medium">Cadastro</a>
+        <a href="/system/clients.html" class="nav-link text-white hover:text-gray-200 font-medium">Clientes</a>
+        <a href="/system/stock.html" class="nav-link text-white hover:text-gray-200 font-medium">Estoque</a>
+        <a href="/system/barcode.html" class="nav-link text-white hover:text-gray-200 font-medium">Leitor</a>
+        <a href="/system/plans.html" class="nav-link text-white hover:text-gray-200 font-medium">Planos</a>
+        <a href="/system/installers.html" class="nav-link text-white hover:text-gray-200 font-medium">Instaladores</a>
+        <button onclick="logout()" class="btn-logout bg-red-600 text-white p-2 rounded-lg hover:bg-red-700">
+          <i class="fas fa-sign-out-alt"></i> Sair
+        </button>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Mobile Menu Overlay -->
+  <div id="menu-backdrop" class="menu-backdrop fixed inset-0 bg-black/50 z-40 lg:hidden"></div>
+
+  <!-- Mobile Menu -->
+  <div id="mobile-menu" class="mobile-menu fixed left-0 top-0 h-full w-4/5 max-w-sm bg-white dark:bg-gray-800 z-50 lg:hidden overflow-y-auto">
+    <div class="p-4 border-b border-gray-200 dark:border-gray-700">
+      <div class="flex items-center justify-between">
+        <h2 class="text-xl font-semibold text-gray-800 dark:text-white">Menu</h2>
+        <button id="close-menu-button" class="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">
+          <i class="fas fa-times text-2xl"></i>
+        </button>
+      </div>
+    </div>
+    <nav class="p-4">
+      <ul class="space-y-4">
+        <li>
+          <a href="/system/dashboard.html" class="flex items-center gap-3 text-gray-700 dark:text-gray-200 hover:text-blue-600 dark:hover:text-blue-400 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700">
+            <i class="fas fa-chart-line w-5"></i>
+            <span>Dashboard</span>
+          </a>
+        </li>
+        <li>
+          <a href="/system/index.html" class="flex items-center gap-3 text-gray-700 dark:text-gray-200 hover:text-blue-600 dark:hover:text-blue-400 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700">
+            <i class="fas fa-plus-circle w-5"></i>
+            <span>Cadastro</span>
+          </a>
+        </li>
+        <li>
+          <a href="/system/clients.html" class="flex items-center gap-3 text-gray-700 dark:text-gray-200 hover:text-blue-600 dark:hover:text-blue-400 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700">
+            <i class="fas fa-users w-5"></i>
+            <span>Clientes</span>
+          </a>
+        </li>
+        <li>
+          <a href="/system/stock.html" class="flex items-center gap-3 text-gray-700 dark:text-gray-200 hover:text-blue-600 dark:hover:text-blue-400 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700">
+            <i class="fas fa-box w-5"></i>
+            <span>Estoque</span>
+          </a>
+        </li>
+        <li>
+          <a href="/system/barcode.html" class="flex items-center gap-3 text-gray-700 dark:text-gray-200 hover:text-blue-600 dark:hover:text-blue-400 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700">
+            <i class="fas fa-barcode w-5"></i>
+            <span>Leitor</span>
+          </a>
+        </li>
+        <li>
+          <a href="/system/plans.html" class="flex items-center gap-3 text-gray-700 dark:text-gray-200 hover:text-blue-600 dark:hover:text-blue-400 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700">
+            <i class="fas fa-list-alt w-5"></i>
+            <span>Planos</span>
+          </a>
+        </li>
+        <li>
+          <a href="/system/installers.html" class="flex items-center gap-3 text-gray-700 dark:text-gray-200 hover:text-blue-600 dark:hover:text-blue-400 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700">
+            <i class="fas fa-hard-hat w-5"></i>
+            <span>Instaladores</span>
+          </a>
+        </li>
+        <li>
+          <button onclick="logout()" class="flex items-center gap-3 text-white bg-red-600 hover:bg-red-700 p-2 rounded-lg mt-4 w-full">
+            <i class="fas fa-sign-out-alt w-5"></i>
+            <span>Sair</span>
+          </button>
+        </li>
+      </ul>
+    </nav>
+  </div>
+
+  <div class="mt-20 max-w-7xl mx-auto p-4 sm:p-6 container">
+    <div class="bg-white/95 p-6 sm:p-8 rounded-[20px] shadow-xl backdrop-blur-md border border-white/20">
+      <div class="mb-8 text-center">
+        <div class="text-5xl mb-4 text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-purple-600">
+          <i class="fas fa-users"></i>
+        </div>
+        <h2 class="text-2xl font-bold text-gray-800 mb-2">Clientes Cadastrados</h2>
+        <p class="text-gray-600">Gerencie todos os seus clientes em um só lugar</p>
+      </div>
+
+            <div class="mb-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div class="input-icon">
+          <input id="searchName" type="text" placeholder="Buscar por nome..." class="p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 w-full" onkeyup="filterClients()" />
+          <i class="fas fa-user"></i>
+        </div>
+        <div class="input-icon">
+          <input id="searchCPF" type="text" placeholder="Buscar por CPF..." class="p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 w-full" onkeyup="filterClients()" />
+          <i class="fas fa-id-card"></i>
+        </div>
+        <div class="input-icon">
+          <input id="searchSerial" type="text" placeholder="Buscar por Serial..." class="p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 w-full" onkeyup="filterClients()" />
+          <i class="fas fa-barcode"></i>
+        </div>
+        <div class="input-icon">
+          <select id="filterCity" class="p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 w-full" onchange="filterClients()">
+            <option value="">Todas as cidades</option>
+            <option value="Ipixuna">Ipixuna</option>
+            <option value="Eirunepé">Eirunepé</option>
+            <option value="Carauari">Carauari</option>
+            <option value="Itamarati">Itamarati</option>
+          </select>
+          <i class="fas fa-map-marker-alt"></i>
+        </div>
+        <div class="input-icon">
+          <select id="filterStatus" class="p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 w-full" onchange="filterClients()">
+            <option value="">Todos os status</option>
+            <option value="1">Ativo</option>
+            <option value="0">Inativo</option>
+          </select>
+          <i class="fas fa-toggle-on"></i>
+        </div>
+        <div class="input-icon">
+          <select id="filterPlan" class="p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 w-full" onchange="filterClients()">
+            <option value="">Todos os planos</option>
+          </select>
+          <i class="fas fa-layer-group"></i>
+        </div>
+        <div class="input-icon">
+          <select id="filterInstaller" class="p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 w-full" onchange="filterClients()">
+            <option value="">Todos os instaladores</option>
+          </select>
+          <i class="fas fa-wrench"></i>
+        </div>
+        <div class="input-icon">
+          <input id="filterDueDay" type="number" min="10" max="30" step="10" placeholder="Dia de vencimento..." class="p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 w-full" onchange="filterClients()" />
+          <i class="fas fa-calendar"></i>
+        </div>
+      </div>
+
+      <div class="flex flex-col sm:flex-row justify-center gap-4 mb-6">
+        <button onclick="exportToCSV()" class="btn-report text-white flex items-center gap-2">
+          <i class="fas fa-download"></i> Exportar CSV
+        </button>
+        <button onclick="openImportModal()" class="btn-report text-white flex items-center gap-2">
+          <i class="fas fa-upload"></i> Importar CSV
+        </button>
+        <button onclick="window.location.href='/system/report.html'" class="btn-report text-white flex items-center gap-2">
+          <i class="fas fa-file-pdf"></i> Gerar Relatório
+        </button>
+        <button onclick="window.location.href='/system/index.html'" class="btn-edit text-white flex items-center gap-2">
+          <i class="fas fa-user-plus"></i> Novo Cliente
+        </button>
+      </div>
+
+      <p id="clientCount" class="text-gray-600 mb-4 text-center font-medium text-lg">Total de Clientes: 0</p>
+      <ul id="clientList" class='space-y-4'></ul>
+      
+      <!-- Paginação -->
+      <div id="pagination" class="flex justify-center items-center gap-2 mt-8">
+        <button onclick="previousPage()" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition disabled:opacity-50" id="prevBtn">
+          <i class="fas fa-chevron-left"></i> Anterior
+        </button>
+        <span id="pageInfo" class="px-4 py-2 bg-gray-100 rounded-lg font-medium">Página 1 de 1</span>
+        <button onclick="nextPage()" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition disabled:opacity-50" id="nextBtn">
+          Próxima <i class="fas fa-chevron-right"></i>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div id="modal" class="modal fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden">
+    <div class="bg-white p-6 rounded-lg shadow-xl max-w-md w-full sm:w-3/4">
+      <h3 id="modalTitle" class="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2"></h3>
+      <p id="modalMessage" class="text-gray-600 mb-6"></p>
+      <button onclick="closeModal()" class="bg-blue-600 text-white p-2 rounded-lg hover:bg-blue-700 w-full flex items-center justify-center gap-2">
+        <i class="fas fa-check"></i> OK
+      </button>
+    </div>
+  </div>
+
+  <!-- Modal de Confirmação para Delete -->
+  <div id="confirmModal" class="modal fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden z-50">
+    <div class="bg-white p-6 rounded-lg shadow-xl max-w-md w-full sm:w-3/4">
+      <h3 class="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
+        <i class="fas fa-exclamation-triangle text-yellow-500"></i> Confirmar Exclusão
+      </h3>
+      <p id="confirmMessage" class="text-gray-600 mb-6"></p>
+      <div class="flex gap-3 justify-end">
+        <button onclick="cancelDelete()" class="px-4 py-2 bg-gray-300 text-gray-800 rounded-lg hover:bg-gray-400 transition flex items-center gap-2">
+          <i class="fas fa-times"></i> Cancelar
+        </button>
+        <button onclick="confirmDelete()" class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition flex items-center gap-2">
+          <i class="fas fa-trash"></i> Excluir
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal de Import CSV -->
+  <div id="importModal" class="modal fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden z-50">
+    <div class="bg-white p-6 rounded-lg shadow-xl max-w-2xl w-full sm:w-3/4">
+      <h3 class="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
+        <i class="fas fa-upload text-blue-600"></i> Importar Clientes via CSV
+      </h3>
+      
+      <!-- Upload area -->
+      <div class="mb-6">
+        <label class="block text-gray-700 font-medium mb-2">Selecione arquivo CSV:</label>
+        <div id="dropZone" class="border-2 border-dashed border-blue-400 rounded-lg p-8 text-center cursor-pointer hover:bg-blue-50 transition">
+          <i class="fas fa-cloud-upload-alt text-blue-400 text-4xl mb-3"></i>
+          <p class="text-gray-600 mb-2">Arraste arquivo aqui ou clique para selecionar</p>
+          <input type="file" id="csvFile" accept=".csv" class="hidden" onchange="handleFileSelect(event)" />
+          <button type="button" onclick="document.getElementById('csvFile').click()" class="text-blue-600 underline hover:text-blue-800">Clique para escolher arquivo</button>
+        </div>
+        <p class="text-sm text-gray-500 mt-3">
+          <strong>Formato esperado:</strong> CSV com colunas: Nome, CPF, Serial, Endereço, Número, Complemento, Cidade, Telefone, Data Nascimento, Plano, Instalador, PPPoE, Senha, Vencimento, Observação
+        </p>
+      </div>
+
+      <!-- Preview -->
+      <div id="previewSection" class="mb-6 hidden">
+        <label class="block text-gray-700 font-medium mb-2">Preview dos dados:</label>
+        <div id="previewData" class="bg-gray-50 rounded-lg p-4 overflow-auto max-h-300px border border-gray-200">
+          <!-- Preview será inserido aqui -->
+        </div>
+        <p id="previewStats" class="text-sm text-gray-600 mt-2"></p>
+      </div>
+
+      <!-- Botões -->
+      <div class="flex gap-3 justify-end">
+        <button onclick="closeImportModal()" class="px-4 py-2 bg-gray-300 text-gray-800 rounded-lg hover:bg-gray-400 transition flex items-center gap-2">
+          <i class="fas fa-times"></i> Cancelar
+        </button>
+        <button onclick="importCSVData()" id="importBtn" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition flex items-center gap-2 disabled:opacity-50" disabled>
+          <i class="fas fa-check"></i> Importar
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let allClients = [];
+    let filteredClients = [];
+    let currentPage = 1;
+    const itemsPerPage = 50;
+    let pendingDeleteCPF = null;
+    let pendingDeleteName = null;
+    let uniquePlans = [];
+    let uniqueInstallers = [];
+
+    var gk_isXlsx = false;
+    var gk_xlsxFileLookup = {};
+    var gk_fileData = {};
+
+    function filledCell(cell) {
+      return cell !== '' && cell != null;
+    }
+
+    function loadFileData(filename) {
+      if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
+        try {
+          var workbook = XLSX.read(gk_fileData[filename], { type: 'base64' });
+          var firstSheetName = workbook.SheetNames[0];
+          var worksheet = workbook.Sheets[firstSheetName];
+          var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false, defval: '' });
+          var filteredData = jsonData.filter(row => row.some(filledCell));
+          var headerRowIndex = filteredData.findIndex((row, index) =>
+            row.filter(filledCell).length >= filteredData[index + 1]?.filter(filledCell).length
+          );
+          if (headerRowIndex === -1 || headerRowIndex > 25) {
+            headerRowIndex = 0;
+          }
+          var csv = XLSX.utils.aoa_to_sheet(filteredData.slice(headerRowIndex));
+          csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
+          return csv;
+        } catch (e) {
+          console.error(e);
+          return "";
+        }
+      }
+      return gk_fileData[filename] || "";
+    }
+
+    async function checkAuth() {
+      try {
+        const response = await fetch('/system/api/clients.php?action=check_auth', {
+          credentials: 'include'
+        });
+        console.log('Resposta da API check_auth:', response);
+        const text = await response.text();
+        console.log('Texto da resposta check_auth:', text);
+        
+        // Se retornar 401 (não autenticado), redirecionar para login
+        if (response.status === 401) {
+          window.location.href = '/system/login.html';
+          return;
+        }
+        
+        if (!response.ok) {
+          let errorData = {};
+          try {
+            errorData = JSON.parse(text);
+          } catch (e) {
+            // Não é JSON válido
+          }
+          throw new Error(errorData.error || `Erro HTTP ${response.status}: ${errorData.details || text || 'Erro desconhecido'}`);
+        }
+        const result = JSON.parse(text);
+        console.log('Resultado da autenticação:', result);
+        if (!result.success) {
+          throw new Error(result.error || 'Não autenticado');
+        }
+        loadClients();
+      } catch (error) {
+        console.error('Erro ao verificar autenticação:', error.message);
+        showModal('Erro', `Erro ao verificar autenticação: ${error.message}. Tente novamente ou faça login.`, 'fas fa-exclamation-circle text-red-600');
+        if (error.message.includes('Não autenticado')) {
+          setTimeout(() => {
+            window.location.href = '/system/login.html';
+          }, 5000);
+        }
+      }
+    }
+
+    async function logout() {
+      try {
+        const response = await fetch('/system/api/logout.php', { 
+          method: 'POST',
+          credentials: 'include'
+        });
+        if (!response.ok) throw new Error('Erro ao fazer logout');
+        window.location.href = '/system/login.html';
+      } catch (error) {
+        console.error('Erro ao fazer logout:', error);
+        window.location.href = '/system/login.html';
+      }
+    }
+
+    function showModal(title, message, iconClass = 'fas fa-info-circle text-blue-600') {
+      document.getElementById('modalTitle').innerHTML = `<i class="${iconClass}"></i> ${title}`;
+      document.getElementById('modalMessage').textContent = message;
+      const modal = document.getElementById('modal');
+      modal.classList.remove('hidden');
+      modal.classList.add('show');
+      setTimeout(() => modal.classList.add('show'), 10);
+    }
+
+    function closeModal() {
+      const modal = document.getElementById('modal');
+      modal.classList.remove('show');
+      setTimeout(() => modal.classList.add('hidden'), 300);
+    }
+
+    function formatCPF(cpf) {
+      if (!cpf) return '';
+      cpf = cpf.replace(/\D/g, '');
+      return cpf.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
+    }
+
+    function formatPhone(phone) {
+      if (!phone) return '';
+      phone = phone.replace(/\D/g, '');
+      if (phone.length === 11) {
+        return phone.replace(/(\d{2})(\d{5})(\d{4})/, '($1) $2-$3');
+      } else if (phone.length === 10) {
+        return phone.replace(/(\d{2})(\d{4})(\d{4})/, '($1) $2-$3');
+      }
+      return phone;
+    }
+
+    function formatDate(date) {
+      if (!date) return '';
+      const [year, month, day] = date.split('-');
+      return `${day}/${month}/${year}`;
+    }
+
+    async function updateClientActive(cpf, active) {
+      try {
+        const response = await fetch('/system/api/clients.php?action=update_active', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ cpf, active }),
+          credentials: 'include'
+        });
+        const text = await response.text();
+        console.log('Resposta da API update_active:', response);
+        console.log('Texto da resposta update_active:', text);
+        if (!response.ok) {
+          let errorData;
+          try {
+            errorData = JSON.parse(text);
+            throw new Error(errorData.error || `Erro HTTP ${response.status}: ${errorData.details || 'Detalhes não fornecidos'}`);
+          } catch (e) {
+            throw new Error(`Erro HTTP ${response.status}: Resposta inválida - ${text}`);
+          }
+        }
+        const result = JSON.parse(text);
+        if (!result.success) {
+          throw new Error(result.error || 'Falha ao atualizar status');
+        }
+        showModal('Sucesso', 'Status do cliente atualizado com sucesso!', 'fas fa-check-circle text-green-600');
+      } catch (error) {
+        console.error('Erro ao atualizar status:', error.message);
+        showModal('Erro', `Erro ao atualizar status: ${error.message}`, 'fas fa-exclamation-circle text-red-600');
+        loadClients();
+      }
+    }
+
+    function renderClients(clients) {
+      const clientList = document.getElementById('clientList');
+      clientList.innerHTML = '';
+      if (clients.length === 0) {
+        const li = document.createElement('li');
+        li.className = 'p-4 bg-gray-50 rounded-lg text-center text-gray-600';
+        li.textContent = 'Nenhum cliente encontrado.';
+        clientList.appendChild(li);
+      } else {
+        clients.forEach((client, index) => {
+          const li = document.createElement('li');
+          li.className = 'client-card p-4 bg-gray-50 rounded-lg shadow-sm';
+          li.style.setProperty('--index', index);
+          li.innerHTML = `
+            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+              <div class="flex items-center gap-3">
+                <i class="fas fa-user text-blue-600 text-xl"></i>
+                <div>
+                  <strong class="text-gray-800 text-lg">${client.name}</strong><br>
+                  <span class="text-gray-600">CPF: ${formatCPF(client.cpf)}</span><br>
+                  <span class="text-gray-600">Serial: ${client.serial}</span><br>
+                  <span class="text-gray-600">Endereço: ${client.address}${client.number ? ', ' + client.number : ''}${client.complement ? ' - ' + client.complement : ''}${client.city ? ', ' + client.city : ''}</span><br>
+                  ${client.phone ? `<span class="text-gray-600">Telefone: ${formatPhone(client.phone)}</span><br>` : ''}
+                  ${client.birthDate ? `<span class="text-gray-600">Data de Nascimento: ${formatDate(client.birthDate)}</span><br>` : ''}
+                  ${client.dueDay ? `<span class="text-gray-600">Dia de Vencimento: ${client.dueDay}</span><br>` : ''}
+                  ${client.observation ? `<span class="text-gray-600">Observação: ${client.observation}</span><br>` : ''}
+                  <span class="text-gray-600">Plano: ${client.plan_name || 'Nenhum'}</span><br>
+                  <span class="text-gray-600">Instalador: ${client.installer || 'Nenhum'}</span><br>
+                  <span class="text-gray-600">Equipamento: ${client.equipment_name || 'Nenhum'}</span><br>
+                  <span class="text-gray-600">PPPoE: ${client.pppoe}</span><br>
+                  <span class="text-gray-600">Senha: ${client.password}</span><br>
+                  <label class="flex items-center gap-2 text-gray-600">
+                    <input type="checkbox" class="checkbox-active" ${client.active ? 'checked' : ''} onchange="updateClientActive('${client.cpf}', this.checked)">
+                    Ativo
+                  </label>
+                </div>
+              </div>
+              <div class="flex gap-2">
+                <button onclick="editClient('${client.cpf}')" class="btn-edit bg-blue-600 text-white p-2 rounded-lg hover:bg-blue-700">
+                  <i class="fas fa-edit"></i> Editar
+                </button>
+                <button onclick="deleteClient('${client.cpf}', '${client.name.replace(/'/g, "\\'")}')" class="btn-delete bg-red-600 text-white p-2 rounded-lg hover:bg-red-700">
+                  <i class="fas fa-trash"></i> Excluir
+                </button>
+              </div>
+            </div>
+          `;
+          clientList.appendChild(li);
+        });
+      }
+      document.getElementById('clientCount').textContent = `Total de Clientes: ${clients.length}`;
+    }
+
+    function filterClients() {
+      const searchName = document.getElementById('searchName').value.toLowerCase();
+      const searchCPF = document.getElementById('searchCPF').value.toLowerCase();
+      const searchSerial = document.getElementById('searchSerial').value.toLowerCase();
+      const filterCity = document.getElementById('filterCity').value;
+      const filterStatus = document.getElementById('filterStatus').value;
+      const filterPlan = document.getElementById('filterPlan').value;
+      const filterInstaller = document.getElementById('filterInstaller').value;
+      const filterDueDay = document.getElementById('filterDueDay').value;
+
+      filteredClients = allClients.filter(client => {
+        const matchesName = client.name.toLowerCase().includes(searchName);
+        const matchesCPF = client.cpf.includes(searchCPF);
+        const matchesSerial = client.serial.toLowerCase().includes(searchSerial);
+        const matchesCity = !filterCity || client.city === filterCity;
+        const matchesStatus = !filterStatus || client.active.toString() === filterStatus;
+        const matchesPlan = !filterPlan || client.plan_name === filterPlan;
+        const matchesInstaller = !filterInstaller || client.installer === filterInstaller;
+        const matchesDueDay = !filterDueDay || (client.dueDay && client.dueDay.toString() === filterDueDay);
+        
+        return matchesName && matchesCPF && matchesSerial && matchesCity && matchesStatus && 
+               matchesPlan && matchesInstaller && matchesDueDay;
+      });
+
+      currentPage = 1;
+      renderClients();
+    }
+
+    async function loadClients() {
+      try {
+        const response = await fetch('/system/api/clients.php', {
+          credentials: 'include'
+        });
+        console.log('Resposta da API clients:', response);
+        const text = await response.text();
+        console.log('Texto da resposta clients:', text);
+        if (!response.ok) {
+          let errorData;
+          try {
+            errorData = JSON.parse(text);
+            throw new Error(errorData.error || `Erro HTTP ${response.status}: ${errorData.details || 'Detalhes não fornecidos'}`);
+          } catch (e) {
+            throw new Error(`Erro HTTP ${response.status}: Resposta inválida - ${text}`);
+          }
+        }
+        const result = JSON.parse(text);
+        if (!result.success) {
+          throw new Error(result.error || 'Falha ao carregar clientes');
+        }
+        allClients = result.data || [];
+        filteredClients = [...allClients]; // Iniciar com todos
+        
+        // Preencher dropdowns com valores únicos
+        populateFilters();
+        
+        renderClients();
+      } catch (error) {
+        console.error('Erro ao carregar clientes:', error.message);
+        showModal('Erro', `Erro ao carregar clientes: ${error.message}. Tente novamente ou faça login.`, 'fas fa-exclamation-circle text-red-600');
+        if (error.message.includes('Não autenticado')) {
+          setTimeout(() => {
+            window.location.href = '/system/login.html';
+          }, 5000);
+        }
+      }
+    }
+
+    function populateFilters() {
+      // Preencher filtro de Planos
+      const plansSet = new Set();
+      allClients.forEach(c => {
+        if (c.plan_name) plansSet.add(c.plan_name);
+      });
+      const planSelect = document.getElementById('filterPlan');
+      plansSet.forEach(plan => {
+        const option = document.createElement('option');
+        option.value = plan;
+        option.textContent = plan;
+        planSelect.appendChild(option);
+      });
+
+      // Preencher filtro de Instaladores
+      const installersSet = new Set();
+      allClients.forEach(c => {
+        if (c.installer) installersSet.add(c.installer);
+      });
+      const installerSelect = document.getElementById('filterInstaller');
+      installersSet.forEach(installer => {
+        const option = document.createElement('option');
+        option.value = installer;
+        option.textContent = installer;
+        installerSelect.appendChild(option);
+      });
+    }
+
+    function renderClients() {
+      const clientList = document.getElementById('clientList');
+      clientList.innerHTML = '';
+      
+      if (filteredClients.length === 0) {
+        const li = document.createElement('li');
+        li.className = 'p-4 bg-gray-50 rounded-lg text-center text-gray-600';
+        li.textContent = 'Nenhum cliente encontrado.';
+        clientList.appendChild(li);
+        updatePagination();
+        return;
+      }
+
+      // Calcular paginação
+      const totalPages = Math.ceil(filteredClients.length / itemsPerPage);
+      const startIndex = (currentPage - 1) * itemsPerPage;
+      const endIndex = startIndex + itemsPerPage;
+      const pageClients = filteredClients.slice(startIndex, endIndex);
+
+      pageClients.forEach((client, index) => {
+        const li = document.createElement('li');
+        li.className = 'client-card p-4 sm:p-6';
+        li.style.setProperty('--index', index);
+        li.innerHTML = `
+          <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+            <div class="flex-grow">
+              <strong class="text-blue-600">${escapeHtml(client.name)}</strong>
+              <p class="text-gray-600 text-sm mt-2">
+                <i class="fas fa-id-card text-blue-500"></i> CPF: ${formatCPF(client.cpf)}
+              </p>
+              <p class="text-gray-600 text-sm">
+                <i class="fas fa-barcode text-blue-500"></i> Serial: ${escapeHtml(client.serial)}
+              </p>
+              <p class="text-gray-600 text-sm">
+                <i class="fas fa-map-marker-alt text-blue-500"></i> Cidade: ${client.city || 'N/A'}
+              </p>
+              <p class="text-gray-600 text-sm">
+                <i class="fas fa-layer-group text-blue-500"></i> Plano: ${client.plan_name || 'N/A'}
+              </p>
+              <p class="text-gray-600 text-sm">
+                <i class="fas fa-wrench text-blue-500"></i> Instalador: ${escapeHtml(client.installer)}
+              </p>
+              <p class="text-gray-600 text-sm">
+                <i class="fas fa-phone text-blue-500"></i> Telefone: ${formatPhone(client.phone) || 'N/A'}
+              </p>
+              <p class="text-gray-600 text-sm">
+                <i class="fas fa-calendar text-blue-500"></i> Vencimento: ${client.dueDay || 'N/A'}
+              </p>
+              <p class="text-gray-600 text-sm">
+                <i class="fas fa-toggle-on text-blue-500"></i> Status: <span class="${client.active ? 'text-green-600 font-bold' : 'text-red-600 font-bold'}">${client.active ? 'Ativo' : 'Inativo'}</span>
+              </p>
+            </div>
+            <div class="flex flex-col gap-2 sm:gap-3 w-full sm:w-auto">
+              <label class="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" class="checkbox-active" ${client.active ? 'checked' : ''} onchange="updateClientActive('${client.cpf}', this.checked)" />
+                <span class="text-sm text-gray-600">Ativo</span>
+              </label>
+              <button onclick="editClient('${client.cpf}')" class="btn-edit text-white flex items-center gap-2 text-sm">
+                <i class="fas fa-edit"></i> Editar
+              </button>
+              <button onclick="showDeleteConfirm('${client.cpf}', '${escapeHtml(client.name)}')" class="btn-delete text-white flex items-center gap-2 text-sm">
+                <i class="fas fa-trash"></i> Excluir
+              </button>
+            </div>
+          </div>
+        `;
+        clientList.appendChild(li);
+      });
+
+      document.getElementById('clientCount').textContent = `Total de Clientes: ${filteredClients.length} (Página ${currentPage} de ${totalPages})`;
+      updatePagination();
+    }
+
+    function updatePagination() {
+      const totalPages = Math.ceil(filteredClients.length / itemsPerPage);
+      document.getElementById('pageInfo').textContent = `Página ${currentPage} de ${totalPages}`;
+      document.getElementById('prevBtn').disabled = currentPage === 1;
+      document.getElementById('nextBtn').disabled = currentPage === totalPages || totalPages === 0;
+    }
+
+    function previousPage() {
+      if (currentPage > 1) {
+        currentPage--;
+        renderClients();
+        window.scrollTo(0, 0);
+      }
+    }
+
+    function nextPage() {
+      const totalPages = Math.ceil(filteredClients.length / itemsPerPage);
+      if (currentPage < totalPages) {
+        currentPage++;
+        renderClients();
+        window.scrollTo(0, 0);
+      }
+    }
+
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    function editClient(cpf) {
+      const client = allClients.find(c => c.cpf === cpf);
+      if (!client) {
+        showModal('Erro', 'Cliente não encontrado.', 'fas fa-exclamation-circle text-red-600');
+        return;
+      }
+      localStorage.setItem('editClient', JSON.stringify(client));
+      window.location.href = '/system/index.html?edit=true';
+    }
+
+    function showDeleteConfirm(cpf, name) {
+      pendingDeleteCPF = cpf;
+      pendingDeleteName = name;
+      document.getElementById('confirmMessage').textContent = `Tem certeza que deseja excluir o cliente "${name}"? Esta ação não pode ser desfeita.`;
+      const confirmModal = document.getElementById('confirmModal');
+      confirmModal.classList.remove('hidden');
+      confirmModal.classList.add('show');
+    }
+
+    function cancelDelete() {
+      pendingDeleteCPF = null;
+      pendingDeleteName = null;
+      const confirmModal = document.getElementById('confirmModal');
+      confirmModal.classList.remove('show');
+      setTimeout(() => confirmModal.classList.add('hidden'), 300);
+    }
+
+    async function confirmDelete() {
+      if (!pendingDeleteCPF) return;
+      
+      try {
+        const response = await fetch(`/system/api/clients.php?cpf=${pendingDeleteCPF}`, {
+          method: 'DELETE',
+          credentials: 'include'
+        });
+        const text = await response.text();
+        console.log('Resposta da API delete:', response);
+        console.log('Texto da resposta delete:', text);
+        if (!response.ok) {
+          let errorData;
+          try {
+            errorData = JSON.parse(text);
+            throw new Error(errorData.error || `Erro HTTP ${response.status}: ${errorData.details || 'Detalhes não fornecidos'}`);
+          } catch (e) {
+            throw new Error(`Erro HTTP ${response.status}: Resposta inválida - ${text}`);
+          }
+        }
+        
+        cancelDelete();
+        loadClients();
+        showModal('Sucesso', 'Cliente excluído com sucesso!', 'fas fa-check-circle text-green-600');
+      } catch (error) {
+        console.error('Erro ao excluir cliente:', error);
+        showModal('Erro', `Erro ao excluir cliente: ${error.message}`, 'fas fa-exclamation-circle text-red-600');
+        cancelDelete();
+      }
+    }
+
+    async function deleteClient(cpf, name) {
+      // Função legada para compatibilidade
+      showDeleteConfirm(cpf, name);
+    }
+
+    function initMobileMenu() {
+      const mobileMenuButton = document.getElementById('mobile-menu-button');
+      const closeMenuButton = document.getElementById('close-menu-button');
+      const mobileMenu = document.getElementById('mobile-menu');
+      const menuBackdrop = document.getElementById('menu-backdrop');
+
+      function openMenu() {
+        mobileMenu.classList.add('show');
+        menuBackdrop.classList.add('show');
+        document.body.style.overflow = 'hidden';
+      }
+
+      function closeMenu() {
+        mobileMenu.classList.remove('show');
+        menuBackdrop.classList.remove('show');
+        document.body.style.overflow = '';
+      }
+
+      mobileMenuButton.addEventListener('click', openMenu);
+      closeMenuButton.addEventListener('click', closeMenu);
+      menuBackdrop.addEventListener('click', closeMenu);
+
+      // Fechar menu ao clicar em um link
+      const mobileMenuLinks = mobileMenu.getElementsByTagName('a');
+      Array.from(mobileMenuLinks).forEach(link => {
+        link.addEventListener('click', closeMenu);
+      });
+
+      // Fechar menu ao redimensionar para desktop
+      window.addEventListener('resize', () => {
+        if (window.innerWidth >= 1024) {
+          closeMenu();
+        }
+      });
+    }
+
+    function exportToCSV() {
+      if (filteredClients.length === 0) {
+        showModal('Aviso', 'Nenhum cliente para exportar. Ajuste os filtros e tente novamente.', 'fas fa-info-circle text-blue-600');
+        return;
+      }
+
+      // Headers CSV
+      const headers = ['Nome', 'CPF', 'Serial', 'Endereço', 'Número', 'Complemento', 'Cidade', 'Telefone', 'Data Nascimento', 'Plano', 'Instalador', 'PPPoE', 'Vencimento', 'Equipamento', 'Ativo', 'Observação'];
+      
+      // Dados dos clientes
+      const rows = filteredClients.map(client => [
+        client.name,
+        client.cpf,
+        client.serial,
+        client.address || '',
+        client.number || '',
+        client.complement || '',
+        client.city || '',
+        formatPhone(client.phone) || '',
+        formatDate(client.birthDate) || '',
+        client.plan_name || '',
+        client.installer || '',
+        client.pppoe || '',
+        client.dueDay || '',
+        client.equipment_name || '',
+        client.active ? 'Sim' : 'Não',
+        client.observation || ''
+      ]);
+
+      // Montar CSV com aspas para campos que contêm vírgula
+      let csv = headers.map(h => `"${h}"`).join(',') + '\n';
+      csv += rows.map(row => 
+        row.map(cell => {
+          const cellStr = (cell || '').toString().replace(/"/g, '""');
+          return `"${cellStr}"`;
+        }).join(',')
+      ).join('\n');
+
+      // Download
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      const url = URL.createObjectURL(blob);
+      
+      link.setAttribute('href', url);
+      link.setAttribute('download', `clientes_${new Date().toISOString().split('T')[0]}.csv`);
+      link.style.visibility = 'hidden';
+      
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      showModal('Sucesso', `${filteredClients.length} cliente(s) exportado(s) com sucesso!`, 'fas fa-check-circle text-green-600');
+    }
+
+    let csvData = [];
+
+    function openImportModal() {
+      csvData = [];
+      document.getElementById('csvFile').value = '';
+      document.getElementById('previewSection').classList.add('hidden');
+      document.getElementById('importBtn').disabled = true;
+      const importModal = document.getElementById('importModal');
+      importModal.classList.remove('hidden');
+      importModal.classList.add('show');
+      
+      // Setup drag and drop
+      setupDragAndDrop();
+    }
+
+    function closeImportModal() {
+      const importModal = document.getElementById('importModal');
+      importModal.classList.remove('show');
+      setTimeout(() => importModal.classList.add('hidden'), 300);
+      csvData = [];
+    }
+
+    function setupDragAndDrop() {
+      const dropZone = document.getElementById('dropZone');
+      
+      dropZone.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        dropZone.classList.add('bg-blue-50');
+      });
+
+      dropZone.addEventListener('dragleave', () => {
+        dropZone.classList.remove('bg-blue-50');
+      });
+
+      dropZone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        dropZone.classList.remove('bg-blue-50');
+        const files = e.dataTransfer.files;
+        if (files.length > 0) {
+          handleFileSelect({ target: { files: files } });
+        }
+      });
+    }
+
+    function handleFileSelect(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      if (!file.name.endsWith('.csv')) {
+        showModal('Erro', 'Por favor, selecione um arquivo CSV válido.', 'fas fa-exclamation-circle text-red-600');
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          parseCSV(e.target.result);
+        } catch (error) {
+          showModal('Erro', `Erro ao ler arquivo: ${error.message}`, 'fas fa-exclamation-circle text-red-600');
+        }
+      };
+      reader.readAsText(file);
+    }
+
+    function parseCSV(content) {
+      const lines = content.trim().split('\n');
+      if (lines.length < 2) {
+        showModal('Erro', 'Arquivo CSV vazio ou sem dados.', 'fas fa-exclamation-circle text-red-600');
+        return;
+      }
+
+      // Ler headers
+      const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+      
+      // Mapa de colunas esperadas
+      const expectedHeaders = [
+        'nome', 'cpf', 'serial', 'endereço', 'número', 'complemento', 
+        'cidade', 'telefone', 'data nascimento', 'plano', 'instalador', 
+        'pppoe', 'senha', 'vencimento', 'observação'
+      ];
+
+      // Verificar se tem pelo menos as colunas obrigatórias
+      const requiredHeaders = ['nome', 'cpf', 'serial', 'endereço', 'plano', 'instalador', 'pppoe', 'senha'];
+      const hasRequired = requiredHeaders.every(h => headers.includes(h));
+      
+      if (!hasRequired) {
+        showModal('Erro', `Arquivo CSV deve ter as colunas obrigatórias: ${requiredHeaders.join(', ')}`, 'fas fa-exclamation-circle text-red-600');
+        return;
+      }
+
+      // Ler dados
+      csvData = [];
+      for (let i = 1; i < lines.length; i++) {
+        if (!lines[i].trim()) continue;
+
+        const values = parseCSVLine(lines[i]);
+        if (values.length !== headers.length) {
+          continue;
+        }
+
+        const row = {};
+        headers.forEach((header, index) => {
+          row[header] = values[index] ? values[index].trim() : '';
+        });
+        csvData.push(row);
+      }
+
+      if (csvData.length === 0) {
+        showModal('Erro', 'Nenhum dado válido encontrado no arquivo.', 'fas fa-exclamation-circle text-red-600');
+        return;
+      }
+
+      // Mostrar preview
+      showPreview();
+    }
+
+    function parseCSVLine(line) {
+      const result = [];
+      let current = '';
+      let insideQuotes = false;
+
+      for (let i = 0; i < line.length; i++) {
+        const char = line[i];
+        const nextChar = line[i + 1];
+
+        if (char === '"') {
+          if (insideQuotes && nextChar === '"') {
+            current += '"';
+            i++;
+          } else {
+            insideQuotes = !insideQuotes;
+          }
+        } else if (char === ',' && !insideQuotes) {
+          result.push(current);
+          current = '';
+        } else {
+          current += char;
+        }
+      }
+
+      result.push(current);
+      return result;
+    }
+
+    function showPreview() {
+      const previewSection = document.getElementById('previewSection');
+      const previewData = document.getElementById('previewData');
+      const previewStats = document.getElementById('previewStats');
+      
+      let html = '<table class="w-full text-sm">';
+      html += '<thead><tr class="border-b border-gray-300 bg-gray-100">';
+      
+      // Headers
+      const headers = Object.keys(csvData[0]);
+      headers.forEach(h => {
+        html += `<th class="text-left px-2 py-2 font-semibold">${h}</th>`;
+      });
+      html += '</tr></thead><tbody>';
+
+      // Primeiras 10 linhas
+      const preview = csvData.slice(0, 10);
+      preview.forEach((row, idx) => {
+        html += `<tr class="${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-b border-gray-200">`;
+        headers.forEach(header => {
+          html += `<td class="px-2 py-2 text-gray-700">${escapeHtml(row[header])}</td>`;
+        });
+        html += '</tr>';
+      });
+
+      html += '</tbody></table>';
+      previewData.innerHTML = html;
+      
+      previewStats.textContent = `Total de ${csvData.length} cliente(s) para importar. Mostrando primeiros 10.`;
+      previewSection.classList.remove('hidden');
+      
+      document.getElementById('importBtn').disabled = false;
+    }
+
+    async function importCSVData() {
+      if (csvData.length === 0) {
+        showModal('Erro', 'Nenhum dado para importar.', 'fas fa-exclamation-circle text-red-600');
+        return;
+      }
+
+      const importBtn = document.getElementById('importBtn');
+      importBtn.disabled = true;
+      importBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Importando...';
+
+      try {
+        // Preparar dados - converter plano para ID se necessário
+        const clientsToImport = csvData.map(client => {
+          const prepared = { ...client };
+          
+          // Se plano for texto, manter como está (o backend vai resolver)
+          // Se for número, manter como número
+          if (prepared.plano && !isNaN(prepared.plano)) {
+            prepared.plano = parseInt(prepared.plano);
+          }
+          
+          return prepared;
+        });
+
+        const response = await fetch('/system/api/clients.php?action=import_csv', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          credentials: 'include',
+          body: JSON.stringify({ clients: clientsToImport })
+        });
+
+        const text = await response.text();
+        const result = JSON.parse(text);
+
+        if (!response.ok || !result.success) {
+          throw new Error(result.error || `Erro HTTP ${response.status}`);
+        }
+
+        const message = `✅ Importação Concluída!\n\n✓ Importados: ${result.imported}\n⚠ Pulados: ${result.skipped}`;
+        showModal('Sucesso', message, 'fas fa-check-circle text-green-600');
+        closeImportModal();
+        loadClients();
+      } catch (error) {
+        console.error('Erro ao importar:', error);
+        showModal('Erro', `❌ Erro ao importar\n\n${error.message}`, 'fas fa-exclamation-circle text-red-600');
+      } finally {
+        importBtn.disabled = false;
+        importBtn.innerHTML = '<i class="fas fa-check"></i> Importar';
+      }
+    }
+
+    window.onload = function() {
+      checkAuth();
+      initMobileMenu();
+    };
+  </script>
+</body>
+</html>

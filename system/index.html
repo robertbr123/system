@@ -1,0 +1,1398 @@
+<script type="text/javascript">
+        var gk_isXlsx = false;
+        var gk_xlsxFileLookup = {};
+        var gk_fileData = {};
+        function filledCell(cell) {
+          return cell !== '' && cell != null;
+        }
+        function loadFileData(filename) {
+        if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
+            try {
+                var workbook = XLSX.read(gk_fileData[filename], { type: 'base64' });
+                var firstSheetName = workbook.SheetNames[0];
+                var worksheet = workbook.Sheets[firstSheetName];
+
+                // Convert sheet to JSON to filter blank rows
+                var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false, defval: '' });
+                // Filter out blank rows (rows where all cells are empty, null, or undefined)
+                var filteredData = jsonData.filter(row => row.some(filledCell));
+
+                // Heuristic to find the header row by ignoring rows with fewer filled cells than the next row
+                var headerRowIndex = filteredData.findIndex((row, index) =>
+                  row.filter(filledCell).length >= filteredData[index + 1]?.filter(filledCell).length
+                );
+                // Fallback
+                if (headerRowIndex === -1 || headerRowIndex > 25) {
+                  headerRowIndex = 0;
+                }
+
+                // Convert filtered JSON back to CSV
+                var csv = XLSX.utils.aoa_to_sheet(filteredData.slice(headerRowIndex)); // Create a new sheet from filtered array of arrays
+                csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
+                return csv;
+            } catch (e) {
+                console.error(e);
+                return "";
+            }
+        }
+        return gk_fileData[filename] || "";
+        }
+        </script><!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ondeline System - Cadastro</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" integrity="sha512-iecdLmaskl7CVkqkXNQ/ZH/XLlvWZOJyj7Yy7tcenmpD1ypASozpmT/E0iPtmFIB46ZmdtAc9eNBvH0H/ZpiBw==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    body {
+      font-family: 'Poppins', sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+    }
+    .gradient-header {
+      background: rgba(255, 255, 255, 0.1);
+      backdrop-filter: blur(10px);
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    .nav-link {
+      position: relative;
+      transition: color 0.3s ease;
+    }
+    .nav-link::after {
+      content: '';
+      position: absolute;
+      width: 0;
+      height: 3px;
+      bottom: -6px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: linear-gradient(90deg, #fff, rgba(255,255,255,0.5));
+      transition: width 0.3s ease;
+      border-radius: 3px;
+    }
+    .nav-link:hover::after {
+      width: 100%;
+    }
+    .card {
+      background: rgba(255, 255, 255, 0.95);
+      border-radius: 20px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+      transition: all 0.3s ease;
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+    .card:hover {
+      transform: translateY(-5px);
+      box-shadow: 0 15px 35px rgba(0, 0, 0, 0.3);
+    }
+    .input-icon {
+      position: relative;
+    }
+    .input-icon i {
+      position: absolute;
+      left: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: #6b7280;
+      transition: color 0.3s ease;
+    }
+    .input-icon input:focus + i, .input-icon select:focus + i, .input-icon textarea:focus + i {
+      color: #3b82f6;
+    }
+    .input-icon input, .input-icon select, .input-icon textarea {
+      padding-left: 48px;
+      border-radius: 12px;
+      transition: all 0.3s ease;
+      height: 50px;
+      border: 2px solid transparent;
+      background: rgba(255, 255, 255, 0.9);
+      font-size: 0.95rem;
+      color: #1a1a1a;
+    }
+    .input-icon textarea {
+      height: auto;
+      padding-top: 12px;
+    }
+    .input-icon input:focus, .input-icon select:focus, .input-icon textarea:focus {
+      border-color: #667eea;
+      background: white;
+      box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.1);
+    }
+    .input-error {
+      border-color: #ef4444 !important;
+      background: rgba(254, 226, 226, 0.5) !important;
+    }
+    .error-message {
+      color: #ef4444;
+      font-size: 0.75rem;
+      margin-top: 4px;
+      display: none;
+    }
+    .input-error + .error-message {
+      display: block;
+    }
+    .btn-primary, .btn-clear {
+      transition: all 0.3s ease;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      font-weight: 600;
+      height: 50px;
+      padding: 0 30px;
+      font-size: 1rem;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      border: none;
+      cursor: pointer;
+    }
+    .btn-primary {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+    }
+    .btn-clear {
+      background: rgba(107, 114, 128, 0.8);
+      color: white;
+    }
+    .btn-primary:hover, .btn-clear:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
+    }
+    .btn-primary:active, .btn-clear:active {
+      transform: translateY(0);
+    }
+    .modal {
+      transition: opacity 0.3s ease-in-out, transform 0.3s ease-in-out;
+      transform: scale(0.95);
+    }
+    .modal.show {
+      transform: scale(1);
+    }
+    @media (max-width: 640px) {
+      .container {
+        padding: 0 1rem;
+      }
+      input, select, textarea {
+        font-size: 0.9rem;
+        padding: 0.75rem 2.5rem;
+      }
+      .btn-primary, .btn-clear {
+        font-size: 0.9rem;
+        padding: 0.75rem 1rem;
+      }
+      .card {
+        padding: 1rem;
+      }
+      .modal > div {
+        width: 95%;
+        padding: 1rem;
+      }
+    }
+    /* Estilos do menu mobile */
+    .mobile-menu {
+      transform: translateX(-100%);
+      transition: transform 0.3s ease-in-out;
+    }
+    .mobile-menu.show {
+      transform: translateX(0);
+    }
+    .menu-backdrop {
+      transition: opacity 0.3s ease-in-out;
+      opacity: 0;
+      pointer-events: none;
+    }
+    .menu-backdrop.show {
+      opacity: 1;
+      pointer-events: auto;
+    }
+    /* Novos estilos para melhorias */
+    .progress-container {
+      margin-bottom: 2rem;
+      background: rgba(255, 255, 255, 0.8);
+      padding: 1rem;
+      border-radius: 12px;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    }
+    .progress-bar {
+      width: 100%;
+      height: 8px;
+      background: rgba(226, 232, 240, 0.5);
+      border-radius: 10px;
+      overflow: hidden;
+      margin-bottom: 0.5rem;
+    }
+    .progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #10b981, #06b6d4);
+      transition: width 0.3s ease;
+      border-radius: 10px;
+    }
+    .progress-text {
+      font-size: 0.85rem;
+      color: #6b7280;
+      font-weight: 500;
+    }
+    .accordion {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      margin-bottom: 2rem;
+    }
+    .accordion-item {
+      border-radius: 12px;
+      background: rgba(255, 255, 255, 0.95);
+      overflow: hidden;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+    }
+    .accordion-header {
+      width: 100%;
+      padding: 1rem 1.25rem;
+      background: linear-gradient(135deg, rgba(102, 126, 234, 0.1), rgba(118, 75, 162, 0.1));
+      border: none;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-weight: 600;
+      color: #667eea;
+      transition: all 0.3s ease;
+      user-select: none;
+    }
+    .accordion-header:hover {
+      background: linear-gradient(135deg, rgba(102, 126, 234, 0.15), rgba(118, 75, 162, 0.15));
+    }
+    .accordion-header i:last-child {
+      transition: transform 0.3s ease;
+    }
+    .accordion-header.open i:last-child {
+      transform: rotate(180deg);
+    }
+    .accordion-body {
+      display: none;
+      padding: 1.5rem 1.25rem;
+      border-top: 1px solid rgba(102, 126, 234, 0.1);
+    }
+    .accordion-body.open {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.5rem;
+    }
+    .accordion-body.open.full-width {
+      grid-template-columns: 1fr;
+    }
+    .input-valid {
+      border-color: #10b981 !important;
+      background: rgba(16, 185, 129, 0.05) !important;
+    }
+    .input-valid + i {
+      color: #10b981 !important;
+    }
+    .validation-icon {
+      position: absolute;
+      right: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 0.9rem;
+      display: none;
+    }
+    .input-valid ~ .validation-icon {
+      display: block;
+      color: #10b981;
+    }
+    .input-error ~ .validation-icon {
+      display: block;
+      color: #ef4444;
+    }
+    .recent-clients {
+      background: rgba(255, 255, 255, 0.9);
+      border-radius: 12px;
+      padding: 1.5rem;
+      margin-top: 2rem;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    }
+    .recent-clients h4 {
+      color: #667eea;
+      margin-bottom: 1rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .recent-clients ul {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+    .recent-clients li {
+      padding: 0.75rem 1rem;
+      background: rgba(102, 126, 234, 0.05);
+      border-radius: 8px;
+      margin-bottom: 0.5rem;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .recent-clients li:hover {
+      background: rgba(102, 126, 234, 0.1);
+      padding-left: 1.25rem;
+    }
+    .recent-clients li button {
+      background: none;
+      border: none;
+      color: #667eea;
+      cursor: pointer;
+      font-size: 0.9rem;
+      padding: 0.25rem 0.5rem;
+    }
+    .draft-notice {
+      display: none;
+      background: linear-gradient(135deg, #fbbf24, #f59e0b);
+      color: white;
+      padding: 1rem;
+      border-radius: 12px;
+      margin-bottom: 1.5rem;
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      animation: slideDown 0.3s ease;
+    }
+    .draft-notice.show {
+      display: flex;
+    }
+    @keyframes slideDown {
+      from {
+        opacity: 0;
+        transform: translateY(-20px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+    .review-modal {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.5);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+      padding: 1rem;
+      display: none;
+    }
+    .review-modal.show {
+      display: flex;
+    }
+    .review-content {
+      background: white;
+      border-radius: 20px;
+      padding: 2rem;
+      max-width: 600px;
+      width: 100%;
+      max-height: 80vh;
+      overflow-y: auto;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.3);
+    }
+    .review-field {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+      margin-bottom: 1rem;
+      padding-bottom: 1rem;
+      border-bottom: 1px solid #e5e7eb;
+    }
+    .review-field:last-child {
+      border-bottom: none;
+    }
+    .review-label {
+      font-weight: 600;
+      color: #667eea;
+      font-size: 0.85rem;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .review-value {
+      color: #1f2937;
+      font-size: 0.95rem;
+    }
+    @media (max-width: 640px) {
+      .accordion-body.open {
+        grid-template-columns: 1fr;
+      }
+      .review-field {
+        grid-template-columns: 1fr;
+      }
+      .recent-clients {
+        margin-top: 1rem;
+        padding: 1rem;
+      }
+    }
+  </style>
+</head>
+<body class="min-h-screen">
+  <nav class="gradient-header p-4 shadow-md fixed w-full top-0 z-30">
+    <div class="max-w-7xl mx-auto flex justify-between items-center">
+      <h1 class="text-white text-2xl sm:text-3xl font-bold flex items-center gap-3">
+        <i class="fas fa-globe"></i> Ondeline
+      </h1>
+
+      <!-- Menu Mobile Button -->
+      <button id="mobile-menu-button" class="lg:hidden text-white focus:outline-none">
+        <i class="fas fa-bars text-2xl"></i>
+      </button>
+
+      <!-- Desktop Menu -->
+      <div class="hidden lg:flex space-x-6 items-center">
+        <a href="/system/dashboard.html" class="nav-link text-white hover:text-gray-200 font-medium">Dashboard</a>
+        <a href="/system/index.html" class="nav-link text-white hover:text-gray-200 font-medium">Cadastro</a>
+        <a href="/system/clients.html" class="nav-link text-white hover:text-gray-200 font-medium">Clientes</a>
+        <a href="/system/stock.html" class="nav-link text-white hover:text-gray-200 font-medium">Estoque</a>
+        <a href="/system/barcode.html" class="nav-link text-white hover:text-gray-200 font-medium">Leitor</a>
+        <a href="/system/plans.html" class="nav-link text-white hover:text-gray-200 font-medium">Planos</a>
+        <a href="/system/installers.html" class="nav-link text-white hover:text-gray-200 font-medium">Instaladores</a>
+        <a href="/system/login.html" class="bg-red-600 text-white p-2 rounded-lg hover:bg-red-700 flex items-center gap-2">
+          <i class="fas fa-sign-in-alt"></i> Fazer Login
+        </a>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Mobile Menu Overlay -->
+  <div id="menu-backdrop" class="menu-backdrop fixed inset-0 bg-black/50 z-40 lg:hidden"></div>
+
+  <!-- Mobile Menu -->
+  <div id="mobile-menu" class="mobile-menu fixed left-0 top-0 h-full w-4/5 max-w-sm bg-white dark:bg-gray-800 z-50 lg:hidden overflow-y-auto">
+    <div class="p-4 border-b border-gray-200 dark:border-gray-700">
+      <div class="flex items-center justify-between">
+        <h2 class="text-xl font-semibold text-gray-800 dark:text-white">Menu</h2>
+        <button id="close-menu-button" class="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">
+          <i class="fas fa-times text-2xl"></i>
+        </button>
+      </div>
+    </div>
+    <nav class="p-4">
+      <ul class="space-y-4">
+        <li>
+          <a href="/system/dashboard.html" class="flex items-center gap-3 text-gray-700 dark:text-gray-200 hover:text-blue-600 dark:hover:text-blue-400 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700">
+            <i class="fas fa-chart-line w-5"></i>
+            <span>Dashboard</span>
+          </a>
+        </li>
+        <li>
+          <a href="/system/index.html" class="flex items-center gap-3 text-gray-700 dark:text-gray-200 hover:text-blue-600 dark:hover:text-blue-400 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700">
+            <i class="fas fa-plus-circle w-5"></i>
+            <span>Cadastro</span>
+          </a>
+        </li>
+        <li>
+          <a href="/system/clients.html" class="flex items-center gap-3 text-gray-700 dark:text-gray-200 hover:text-blue-600 dark:hover:text-blue-400 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700">
+            <i class="fas fa-users w-5"></i>
+            <span>Clientes</span>
+          </a>
+        </li>
+        <li>
+          <a href="/system/stock.html" class="flex items-center gap-3 text-gray-700 dark:text-gray-200 hover:text-blue-600 dark:hover:text-blue-400 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700">
+            <i class="fas fa-box w-5"></i>
+            <span>Estoque</span>
+          </a>
+        </li>
+        <li>
+          <a href="/system/barcode.html" class="flex items-center gap-3 text-gray-700 dark:text-gray-200 hover:text-blue-600 dark:hover:text-blue-400 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700">
+            <i class="fas fa-barcode w-5"></i>
+            <span>Leitor</span>
+          </a>
+        </li>
+        <li>
+          <a href="/system/plans.html" class="flex items-center gap-3 text-gray-700 dark:text-gray-200 hover:text-blue-600 dark:hover:text-blue-400 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700">
+            <i class="fas fa-list-alt w-5"></i>
+            <span>Planos</span>
+          </a>
+        </li>
+        <li>
+          <a href="/system/installers.html" class="flex items-center gap-3 text-gray-700 dark:text-gray-200 hover:text-blue-600 dark:hover:text-blue-400 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700">
+            <i class="fas fa-hard-hat w-5"></i>
+            <span>Instaladores</span>
+          </a>
+        </li>
+        <li>
+          <a href="/system/login.html" class="flex items-center gap-3 text-white bg-red-600 hover:bg-red-700 p-2 rounded-lg mt-4">
+            <i class="fas fa-sign-in-alt w-5"></i>
+            <span>Fazer Login</span>
+          </a>
+        </li>
+      </ul>
+    </nav>
+  </div>
+
+  <div class="mt-20 max-w-4xl mx-auto p-4 sm:p-6 container">
+    <div class="card p-4 sm:p-6">
+      <!-- Notificação de Rascunho -->
+      <div id="draftNotice" class="draft-notice">
+        <i class="fas fa-history"></i>
+        <span>Rascunho anterior encontrado. Clique para restaurar.</span>
+        <button type="button" onclick="restoreDraft()" style="background: white; color: #f59e0b; border: none; padding: 0.25rem 0.75rem; border-radius: 6px; cursor: pointer; font-weight: 600;">
+          Restaurar
+        </button>
+        <button type="button" onclick="closeDraftNotice()" style="background: none; border: none; color: white; cursor: pointer; margin-left: auto;">
+          <i class="fas fa-times"></i>
+        </button>
+      </div>
+
+      <!-- Barra de Progresso -->
+      <div class="progress-container">
+        <div class="progress-bar">
+          <div id="progressFill" class="progress-fill" style="width: 0%"></div>
+        </div>
+        <div class="progress-text">
+          <i class="fas fa-tasks"></i> Formulário
+          <strong id="fillPercent">0</strong>% completo
+          <span id="requiredInfo" style="margin-left: 1rem; color: #ef4444;">(<span id="requiredCount">0</span> obrigatórios)</span>
+        </div>
+      </div>
+
+      <div class="mb-8 text-center">
+        <div class="text-5xl mb-4 text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-purple-600">
+          <i class="fas fa-user-plus"></i>
+        </div>
+        <h2 class="text-2xl font-bold text-gray-800 mb-2">Cadastro de Cliente</h2>
+        <p class="text-gray-600">Preencha todos os campos obrigatórios para cadastrar um novo cliente</p>
+      </div>
+
+      <form id="clientForm" class="accordion">
+        <!-- SEÇÃO 1: DADOS PESSOAIS -->
+        <div class="accordion-item">
+          <button type="button" class="accordion-header open" onclick="toggleAccordion(this)">
+            <span><i class="fas fa-user"></i> 📋 Dados Pessoais</span>
+            <i class="fas fa-chevron-down"></i>
+          </button>
+          <div class="accordion-body open">
+            <div class="input-icon">
+              <input id="cpf" type="text" placeholder="CPF (somente números)" class="p-3 border rounded-lg focus:outline-none bg-gray-50 w-full" maxlength="11" />
+              <i class="fas fa-id-card"></i>
+              <i class="validation-icon"></i>
+              <div class="error-message" id="cpf-error">CPF inválido</div>
+            </div>
+            <div class="input-icon">
+              <input id="serial" type="text" placeholder="Serial" class="p-3 border rounded-lg focus:outline-none bg-gray-50 w-full" />
+              <i class="fas fa-barcode"></i>
+              <i class="validation-icon"></i>
+              <div class="error-message" id="serial-error">Serial é obrigatório</div>
+            </div>
+            <div class="input-icon">
+              <input id="phone" type="text" placeholder="Telefone (com DDD)" class="p-3 border rounded-lg focus:outline-none bg-gray-50 w-full" maxlength="11" />
+              <i class="fas fa-phone"></i>
+              <i class="validation-icon"></i>
+              <div class="error-message" id="phone-error">Telefone deve conter 10 ou 11 dígitos</div>
+            </div>
+            <div class="input-icon">
+              <input id="birthDate" type="date" class="p-3 border rounded-lg focus:outline-none bg-gray-50 w-full" />
+              <i class="fas fa-birthday-cake"></i>
+              <i class="validation-icon"></i>
+              <div class="error-message" id="birthDate-error">Cliente deve ter pelo menos 18 anos</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- SEÇÃO 2: INFORMAÇÕES BÁSICAS -->
+        <div class="accordion-item">
+          <button type="button" class="accordion-header open" onclick="toggleAccordion(this)">
+            <span><i class="fas fa-info-circle"></i> 📝 Informações Básicas</span>
+            <i class="fas fa-chevron-down"></i>
+          </button>
+          <div class="accordion-body open full-width">
+            <div class="input-icon">
+              <input id="name" type="text" placeholder="Nome Completo" class="p-3 border rounded-lg focus:outline-none bg-gray-50 w-full" />
+              <i class="fas fa-user"></i>
+              <i class="validation-icon"></i>
+              <div class="error-message" id="name-error">Nome é obrigatório</div>
+            </div>
+            <div class="input-icon">
+              <textarea id="observation" placeholder="Observação" class="p-3 border rounded-lg focus:outline-none bg-gray-50 w-full h-24"></textarea>
+              <i class="fas fa-comment"></i>
+            </div>
+          </div>
+        </div>
+
+        <!-- SEÇÃO 3: ENDEREÇO -->
+        <div class="accordion-item">
+          <button type="button" class="accordion-header" onclick="toggleAccordion(this)">
+            <span><i class="fas fa-map-marker-alt"></i> 📍 Endereço</span>
+            <i class="fas fa-chevron-down"></i>
+          </button>
+          <div class="accordion-body">
+            <div class="input-icon">
+              <input id="address" type="text" placeholder="Endereço" class="p-3 border rounded-lg focus:outline-none bg-gray-50 w-full" />
+              <i class="fas fa-home"></i>
+              <i class="validation-icon"></i>
+              <div class="error-message" id="address-error">Endereço é obrigatório</div>
+            </div>
+            <div class="input-icon">
+              <input id="number" type="text" placeholder="Número" class="p-3 border rounded-lg focus:outline-none bg-gray-50 w-full" />
+              <i class="fas fa-hashtag"></i>
+              <i class="validation-icon"></i>
+              <div class="error-message" id="number-error">Número inválido</div>
+            </div>
+            <div class="input-icon">
+              <input id="complement" type="text" placeholder="Complemento" class="p-3 border rounded-lg focus:outline-none bg-gray-50 w-full" />
+              <i class="fas fa-info-circle"></i>
+            </div>
+            <div class="input-icon">
+              <select id="city" class="p-3 border rounded-lg focus:outline-none bg-gray-50 w-full">
+                <option value="">Selecione a Cidade</option>
+                <option value="Ipixuna">Ipixuna</option>
+                <option value="Eirunepé">Eirunepé</option>
+                <option value="Carauari">Carauari</option>
+                <option value="Itamarati">Itamarati</option>
+              </select>
+              <i class="fas fa-city"></i>
+              <i class="validation-icon"></i>
+              <div class="error-message" id="city-error">Cidade inválida</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- SEÇÃO 4: PLANO E ACESSO -->
+        <div class="accordion-item">
+          <button type="button" class="accordion-header" onclick="toggleAccordion(this)">
+            <span><i class="fas fa-network-wired"></i> 🌐 Plano e Acesso</span>
+            <i class="fas fa-chevron-down"></i>
+          </button>
+          <div class="accordion-body">
+            <div class="input-icon">
+              <select id="planId" class="p-3 border rounded-lg focus:outline-none bg-gray-50 w-full">
+                <option value="">Selecione o Plano</option>
+              </select>
+              <i class="fas fa-box"></i>
+              <i class="validation-icon"></i>
+              <div class="error-message" id="planId-error">Selecione um plano</div>
+            </div>
+            <div id="planDetails" style="grid-column: 2 / 3; background: rgba(102, 126, 234, 0.05); padding: 1rem; border-radius: 8px; display: none;">
+              <div style="font-size: 0.85rem; color: #6b7280; margin-bottom: 0.5rem;">Detalhes do Plano</div>
+              <div style="font-weight: 600; color: #667eea;" id="planDetailsContent"></div>
+            </div>
+            <div class="input-icon">
+              <input id="pppoe" type="text" placeholder="PPPoE" class="p-3 border rounded-lg focus:outline-none bg-gray-50 w-full" />
+              <i class="fas fa-network-wired"></i>
+              <i class="validation-icon"></i>
+              <div class="error-message" id="pppoe-error">PPPoE é obrigatório</div>
+            </div>
+            <div class="input-icon">
+              <input id="password" type="text" placeholder="Senha PPPoE" class="p-3 border rounded-lg focus:outline-none bg-gray-50 w-full" />
+              <i class="fas fa-key"></i>
+              <i class="validation-icon"></i>
+              <div class="error-message" id="password-error">Senha PPPoE é obrigatória</div>
+            </div>
+            <div class="input-icon">
+              <select id="installer" class="p-3 border rounded-lg focus:outline-none bg-gray-50 w-full">
+                <option value="">Selecione o Instalador</option>
+              </select>
+              <i class="fas fa-user-cog"></i>
+              <i class="validation-icon"></i>
+              <div class="error-message" id="installer-error">Selecione um instalador</div>
+            </div>
+            <div class="input-icon">
+              <select id="dueDay" class="p-3 border rounded-lg focus:outline-none bg-gray-50 w-full">
+                <option value="">Dia de Vencimento</option>
+                <option value="10">Dia 10</option>
+                <option value="20">Dia 20</option>
+                <option value="30">Dia 30</option>
+              </select>
+              <i class="fas fa-calendar-day"></i>
+              <i class="validation-icon"></i>
+              <div class="error-message" id="dueDay-error">Dia de vencimento inválido</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- BOTÕES DE AÇÃO -->
+        <div style="display: flex; flex-direction: column; gap: 1rem; margin-top: 2rem;">
+          <div style="display: flex; flex-direction: column; gap: 1rem; justify-content: center;">
+            <button type="button" onclick="saveClient()" id="saveBtn" class="btn-primary bg-green-600 text-white p-3 rounded-lg hover:bg-green-700 flex items-center justify-center gap-2">
+              <i class="fas fa-save"></i> Salvar
+            </button>
+            <button type="button" onclick="clearForm()" class="btn-clear bg-gray-500 text-white p-3 rounded-lg hover:bg-gray-600 flex items-center justify-center gap-2">
+              <i class="fas fa-eraser"></i> Limpar
+            </button>
+            <button type="button" onclick="toggleReviewModal()" class="bg-blue-600 text-white p-3 rounded-lg hover:bg-blue-700 flex items-center justify-center gap-2">
+              <i class="fas fa-eye"></i> Revisar
+            </button>
+          </div>
+          <div style="text-align: center; font-size: 0.85rem; color: #6b7280;">
+            <i class="fas fa-keyboard"></i> Dica: Pressione <kbd style="background: #e5e7eb; padding: 2px 6px; border-radius: 4px;">Ctrl+S</kbd> para salvar
+          </div>
+        </div>
+      </form>
+
+      <!-- ÚLTIMOS CADASTRADOS -->
+      <div class="recent-clients" id="recentClientsSection" style="display: none;">
+        <h4><i class="fas fa-history"></i> Últimos Cadastrados</h4>
+        <ul id="recentList"></ul>
+      </div>
+    </div>
+  </div>
+
+  <div id="modal" class="modal fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden">
+    <div class="bg-white p-6 rounded-lg shadow-xl max-w-md w-full sm:w-3/4">
+      <h3 id="modalTitle" class="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2"></h3>
+      <p id="modalMessage" class="text-gray-600 mb-6"></p>
+      <button onclick="closeModal()" class="bg-blue-600 text-white p-2 rounded-lg hover:bg-blue-700 w-full flex items-center justify-center gap-2">
+        <i class="fas fa-check"></i> OK
+      </button>
+    </div>
+  </div>
+
+  <!-- MODAL DE REVISÃO -->
+  <div id="reviewModal" class="review-modal">
+    <div class="review-content">
+      <h3 style="font-size: 1.5rem; font-weight: 700; color: #1f2937; margin-bottom: 1.5rem; display: flex; align-items: center; gap: 0.75rem;">
+        <i class="fas fa-eye text-blue-600"></i> Revisar Dados do Cliente
+      </h3>
+      <div id="reviewData" style="margin-bottom: 2rem;"></div>
+      <div style="display: flex; gap: 1rem; justify-content: flex-end;">
+        <button type="button" onclick="toggleReviewModal()" class="px-4 py-2 bg-gray-300 text-gray-800 rounded-lg hover:bg-gray-400">
+          <i class="fas fa-times"></i> Cancelar
+        </button>
+        <button type="button" onclick="confirmSaveFromReview()" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center gap-2">
+          <i class="fas fa-check"></i> Confirmar e Salvar
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let allPlans = [];
+    let allInstallers = [];
+    let recentClients = [];
+    let draftExists = false;
+    let savedDraft = null;
+
+    // ===== FUNÇÕES DE DRAFT/RASCUNHO =====
+    function initDraftSaving() {
+      const draft = localStorage.getItem('clientFormDraft');
+      if (draft) {
+        draftExists = true;
+        savedDraft = JSON.parse(draft);
+        document.getElementById('draftNotice').classList.add('show');
+      }
+      
+      // Salvar rascunho a cada mudança
+      const inputs = document.querySelectorAll('input, select, textarea');
+      inputs.forEach(input => {
+        input.addEventListener('change', saveDraft);
+        input.addEventListener('blur', saveDraft);
+      });
+    }
+
+    function saveDraft() {
+      const formData = getClientData();
+      localStorage.setItem('clientFormDraft', JSON.stringify(formData));
+      updateProgress();
+    }
+
+    function restoreDraft() {
+      if (!savedDraft) return;
+      Object.keys(savedDraft).forEach(key => {
+        const input = document.getElementById(key);
+        if (input) input.value = savedDraft[key];
+      });
+      updateProgress();
+      closeDraftNotice();
+    }
+
+    function closeDraftNotice() {
+      document.getElementById('draftNotice').classList.remove('show');
+    }
+
+    // ===== FUNÇÕES DE PROGRESSO =====
+    function updateProgress() {
+      const formData = getClientData();
+      const fields = Object.values(formData);
+      const filledFields = fields.filter(f => f && f.toString().trim() !== '').length;
+      const totalFields = fields.length;
+      
+      // Campos obrigatórios
+      const requiredFields = ['cpf', 'serial', 'name', 'address', 'planId', 'installer', 'pppoe', 'password'];
+      const filledRequired = requiredFields.filter(f => formData[f] && formData[f].toString().trim() !== '').length;
+      
+      const percentage = Math.round((filledFields / totalFields) * 100);
+      document.getElementById('progressFill').style.width = percentage + '%';
+      document.getElementById('fillPercent').textContent = percentage;
+      document.getElementById('requiredCount').textContent = (requiredFields.length - filledRequired);
+    }
+
+    // ===== FUNÇÕES DE ACCORDION =====
+    function toggleAccordion(button) {
+      const body = button.nextElementSibling;
+      const isOpen = body.classList.contains('open');
+      
+      button.classList.toggle('open');
+      body.classList.toggle('open');
+    }
+
+    // ===== FUNÇÕES DE VALIDAÇÃO EM TEMPO REAL =====
+    function setupRealtimeValidation() {
+      document.getElementById('cpf').addEventListener('input', validateCPFRealtime);
+      document.getElementById('serial').addEventListener('input', validateSerialRealtime);
+      document.getElementById('phone').addEventListener('input', validatePhoneRealtime);
+      document.getElementById('birthDate').addEventListener('change', validateBirthDateRealtime);
+      document.getElementById('planId').addEventListener('change', showPlanDetails);
+    }
+
+    function validateCPFRealtime(e) {
+      const isValid = e.target.value.length < 11 ? true : validateCPF(e.target.value);
+      e.target.classList.toggle('input-valid', isValid && e.target.value);
+      e.target.classList.toggle('input-error', !isValid && e.target.value);
+    }
+
+    function validateSerialRealtime(e) {
+      const isValid = e.target.value.length > 0;
+      e.target.classList.toggle('input-valid', isValid);
+    }
+
+    function validatePhoneRealtime(e) {
+      const isValid = e.target.value.length === 0 || validatePhone(e.target.value);
+      e.target.classList.toggle('input-valid', isValid && e.target.value);
+      e.target.classList.toggle('input-error', !isValid && e.target.value);
+    }
+
+    function validateBirthDateRealtime(e) {
+      const isValid = e.target.value.length === 0 || validateBirthDate(e.target.value);
+      e.target.classList.toggle('input-valid', isValid);
+      e.target.classList.toggle('input-error', !isValid && e.target.value);
+    }
+
+    function showPlanDetails(e) {
+      const plan = allPlans.find(p => p.id == e.target.value);
+      const detailsDiv = document.getElementById('planDetails');
+      
+      if (plan) {
+        detailsDiv.style.display = 'block';
+        document.getElementById('planDetailsContent').innerHTML = `
+          <div>${plan.name}</div>
+          <div style="font-size: 1.1rem; color: #10b981; margin-top: 0.25rem;">R$ ${parseFloat(plan.price).toFixed(2)}</div>
+        `;
+      } else {
+        detailsDiv.style.display = 'none';
+      }
+    }
+
+    // ===== FUNÇÕES DE REVISÃO =====
+    function toggleReviewModal() {
+      const modal = document.getElementById('reviewModal');
+      modal.classList.toggle('show');
+      
+      if (modal.classList.contains('show')) {
+        showReviewData();
+      }
+    }
+
+    function showReviewData() {
+      const formData = getClientData();
+      const planName = allPlans.find(p => p.id == formData.planId)?.name || formData.planId;
+      
+      const reviewHTML = `
+        <div class="review-field">
+          <div class="review-label">CPF</div>
+          <div class="review-value">${formData.cpf || '-'}</div>
+        </div>
+        <div class="review-field">
+          <div class="review-label">Serial</div>
+          <div class="review-value">${formData.serial || '-'}</div>
+        </div>
+        <div class="review-field">
+          <div class="review-label">Nome</div>
+          <div class="review-value">${formData.name || '-'}</div>
+        </div>
+        <div class="review-field">
+          <div class="review-label">Endereço</div>
+          <div class="review-value">${formData.address || '-'} ${formData.number ? ', ' + formData.number : ''} ${formData.complement ? formData.complement : ''}</div>
+        </div>
+        <div class="review-field">
+          <div class="review-label">Telefone</div>
+          <div class="review-value">${formData.phone || '-'}</div>
+        </div>
+        <div class="review-field">
+          <div class="review-label">Plano</div>
+          <div class="review-value">${planName || '-'}</div>
+        </div>
+        <div class="review-field">
+          <div class="review-label">Instalador</div>
+          <div class="review-value">${formData.installer || '-'}</div>
+        </div>
+        <div class="review-field">
+          <div class="review-label">PPPoE</div>
+          <div class="review-value">${formData.pppoe || '-'}</div>
+        </div>
+        <div class="review-field">
+          <div class="review-label">Vencimento</div>
+          <div class="review-value">Dia ${formData.dueDay || '-'}</div>
+        </div>
+      `;
+      
+      document.getElementById('reviewData').innerHTML = reviewHTML;
+    }
+
+    function confirmSaveFromReview() {
+      toggleReviewModal();
+      saveClient();
+    }
+
+    // ===== FUNÇÕES DE CLIENTES RECENTES =====
+    function loadRecentClients() {
+      const stored = localStorage.getItem('recentClients');
+      if (stored) {
+        recentClients = JSON.parse(stored);
+        updateRecentClientsUI();
+      }
+    }
+
+    function updateRecentClientsUI() {
+      const section = document.getElementById('recentClientsSection');
+      const list = document.getElementById('recentList');
+      
+      if (recentClients.length === 0) {
+        section.style.display = 'none';
+        return;
+      }
+      
+      section.style.display = 'block';
+      list.innerHTML = recentClients.slice(0, 5).map((client, idx) => `
+        <li>
+          <div>
+            <div style="font-weight: 600; color: #1f2937;">${client.name}</div>
+            <div style="font-size: 0.85rem; color: #6b7280;">CPF: ${client.cpf}</div>
+          </div>
+          <button type="button" onclick="editFromRecent(${idx})" style="background: none; border: none; color: #667eea; cursor: pointer; padding: 0.5rem;">
+            <i class="fas fa-edit"></i>
+          </button>
+        </li>
+      `).join('');
+    }
+
+    function addToRecentClients(client) {
+      const exists = recentClients.findIndex(c => c.cpf === client.cpf);
+      if (exists !== -1) {
+        recentClients.splice(exists, 1);
+      }
+      
+      recentClients.unshift({
+        name: client.name,
+        cpf: client.cpf,
+        serial: client.serial
+      });
+      
+      recentClients = recentClients.slice(0, 10);
+      localStorage.setItem('recentClients', JSON.stringify(recentClients));
+      updateRecentClientsUI();
+    }
+
+    function editFromRecent(index) {
+      const client = recentClients[index];
+      // Preencher formulário com dados do cliente
+      document.getElementById('cpf').value = client.cpf;
+      document.getElementById('serial').value = client.serial;
+      document.getElementById('name').value = client.name;
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    // ===== FUNÇÕES EXISTENTES (MANTIDAS) =====
+    function showModal(title, message, iconClass = 'fas fa-info-circle text-blue-600') {
+      document.getElementById('modalTitle').innerHTML = `<i class="${iconClass}"></i> ${title}`;
+      document.getElementById('modalMessage').textContent = message;
+      const modal = document.getElementById('modal');
+      modal.classList.remove('hidden');
+      modal.classList.add('show');
+      setTimeout(() => modal.classList.add('show'), 10);
+    }
+
+    function closeModal() {
+      const modal = document.getElementById('modal');
+      modal.classList.remove('show');
+      setTimeout(() => modal.classList.add('hidden'), 300);
+    }
+
+    // ===== KEYBOARD SHORTCUTS =====
+    function setupKeyboardShortcuts() {
+      document.addEventListener('keydown', (e) => {
+        // Ctrl+S = Salvar
+        if (e.ctrlKey && e.key === 's') {
+          e.preventDefault();
+          saveClient();
+        }
+        // Ctrl+L = Limpar
+        if (e.ctrlKey && e.key === 'l') {
+          e.preventDefault();
+          clearForm();
+        }
+        // Ctrl+R = Revisar
+        if (e.ctrlKey && e.key === 'r') {
+          e.preventDefault();
+          toggleReviewModal();
+        }
+      });
+    }
+
+    function validateCPF(cpf) {
+      cpf = cpf.replace(/\D/g, '');
+      if (cpf.length !== 11 || /^(\d)\1+$/.test(cpf)) return false;
+      let sum = 0, remainder;
+      for (let i = 1; i <= 9; i++) sum += parseInt(cpf[i-1]) * (11 - i);
+      remainder = (sum * 10) % 11;
+      if (remainder === 10 || remainder === 11) remainder = 0;
+      if (remainder !== parseInt(cpf[9])) return false;
+      sum = 0;
+      for (let i = 1; i <= 10; i++) sum += parseInt(cpf[i-1]) * (12 - i);
+      remainder = (sum * 10) % 11;
+      if (remainder === 10 || remainder === 11) remainder = 0;
+      return remainder === parseInt(cpf[10]);
+    }
+
+    function validatePhone(phone) {
+      phone = phone.replace(/\D/g, '');
+      return phone.length === 10 || phone.length === 11;
+    }
+
+    function validateBirthDate(date) {
+      if (!date) return true;
+      const birth = new Date(date);
+      const today = new Date();
+      const age = today.getFullYear() - birth.getFullYear();
+      const monthDiff = today.getMonth() - birth.getMonth();
+      if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
+        return age - 1 >= 18;
+      }
+      return age >= 18;
+    }
+
+    async function checkDuplicate(field, value, errorElementId, errorMessage) {
+      try {
+        const response = await fetch(`/system/api/check_duplicate.php?field=${field}&value=${encodeURIComponent(value)}`);
+        const result = await response.json();
+        if (result.exists) {
+          document.getElementById(field).classList.add('input-error');
+          document.getElementById(errorElementId).textContent = errorMessage;
+          document.getElementById(errorElementId).classList.add('input-error');
+          return false;
+        }
+        return true;
+      } catch (error) {
+        showModal('Erro', 'Erro ao verificar duplicatas: ' + error.message, 'fas fa-exclamation-circle text-red-600');
+        return false;
+      }
+    }
+
+    function clearErrors() {
+      const inputs = document.querySelectorAll('.input-icon input, .input-icon select, .input-icon textarea');
+      inputs.forEach(input => {
+        input.classList.remove('input-error', 'input-valid');
+        const errorElement = document.getElementById(`${input.id}-error`);
+        if (errorElement) errorElement.classList.remove('input-error');
+      });
+    }
+
+    function setError(inputId, message) {
+      const input = document.getElementById(inputId);
+      const errorElement = document.getElementById(`${inputId}-error`);
+      input.classList.add('input-error');
+      errorElement.textContent = message;
+      errorElement.classList.add('input-error');
+    }
+
+    async function loadPlans() {
+      try {
+        const response = await fetch('/system/api/plans.php');
+        if (!response.ok) throw new Error('Erro ao carregar planos');
+        allPlans = await response.json();
+        const planSelect = document.getElementById('planId');
+        planSelect.innerHTML = '<option value="">Selecione o Plano</option>';
+        allPlans.forEach(plan => {
+          const option = document.createElement('option');
+          option.value = plan.id;
+          option.textContent = `${plan.name} - R$ ${parseFloat(plan.price).toFixed(2)}`;
+          planSelect.appendChild(option);
+        });
+        if (allPlans.length === 0) {
+          setError('planId', 'Nenhum plano disponível');
+        }
+      } catch (error) {
+        console.error('Erro ao carregar planos:', error);
+        showModal('Erro', 'Não foi possível carregar os planos.', 'fas fa-exclamation-circle text-red-600');
+      }
+    }
+
+    async function loadInstallers() {
+      try {
+        const response = await fetch('/system/api/installers.php');
+        if (!response.ok) throw new Error('Erro ao carregar instaladores');
+        allInstallers = await response.json();
+        const installerSelect = document.getElementById('installer');
+        installerSelect.innerHTML = '<option value="">Selecione o Instalador</option>';
+        allInstallers.forEach(installer => {
+          const option = document.createElement('option');
+          option.value = installer.name;
+          option.textContent = installer.name;
+          installerSelect.appendChild(option);
+        });
+        if (allInstallers.length === 0) {
+          setError('installer', 'Nenhum instalador disponível');
+        }
+      } catch (error) {
+        console.error('Erro ao carregar instaladores:', error);
+        showModal('Erro', 'Não foi possível carregar os instaladores.', 'fas fa-exclamation-circle text-red-600');
+      }
+    }
+
+    function getClientData() {
+      return {
+        cpf: document.getElementById('cpf').value.trim(),
+        serial: document.getElementById('serial').value.trim(),
+        name: document.getElementById('name').value.trim(),
+        address: document.getElementById('address').value.trim(),
+        number: document.getElementById('number').value.trim(),
+        complement: document.getElementById('complement').value.trim(),
+        city: document.getElementById('city').value,
+        dueDay: document.getElementById('dueDay').value,
+        phone: document.getElementById('phone').value.trim(),
+        birthDate: document.getElementById('birthDate').value,
+        observation: document.getElementById('observation').value.trim(),
+        planId: document.getElementById('planId').value,
+        installer: document.getElementById('installer').value,
+        pppoe: document.getElementById('pppoe').value.trim(),
+        password: document.getElementById('password').value.trim()
+      };
+    }
+
+    async function validateClient(data, isEdit = false) {
+      clearErrors();
+      let isValid = true;
+
+      if (!data.cpf || !validateCPF(data.cpf)) {
+        setError('cpf', 'CPF inválido');
+        isValid = false;
+      } else if (!isEdit) {
+        isValid = await checkDuplicate('cpf', data.cpf, 'cpf-error', 'CPF já cadastrado') && isValid;
+      }
+
+      if (!data.serial) {
+        setError('serial', 'Serial é obrigatório');
+        isValid = false;
+      } else if (!isEdit) {
+        isValid = await checkDuplicate('serial', data.serial, 'serial-error', 'Serial já cadastrado') && isValid;
+      }
+
+      if (!data.name) {
+        setError('name', 'Nome é obrigatório');
+        isValid = false;
+      }
+
+      if (!data.address) {
+        setError('address', 'Endereço é obrigatório');
+        isValid = false;
+      }
+
+      if (data.phone && !validatePhone(data.phone)) {
+        setError('phone', 'Telefone deve conter 10 ou 11 dígitos');
+        isValid = false;
+      }
+
+      if (data.birthDate && !validateBirthDate(data.birthDate)) {
+        setError('birthDate', 'Cliente deve ter pelo menos 18 anos');
+        isValid = false;
+      }
+
+      if (data.city && !['Ipixuna', 'Eirunepé', 'Carauari', 'Itamarati'].includes(data.city)) {
+        setError('city', 'Cidade inválida');
+        isValid = false;
+      }
+
+      if (data.dueDay && !['10', '20', '30'].includes(data.dueDay)) {
+        setError('dueDay', 'Dia de vencimento deve ser 10, 20 ou 30');
+        isValid = false;
+      }
+
+      if (!data.planId || allPlans.length === 0) {
+        setError('planId', allPlans.length === 0 ? 'Nenhum plano disponível' : 'Selecione um plano');
+        isValid = false;
+      }
+
+      if (!data.installer || allInstallers.length === 0) {
+        setError('installer', allInstallers.length === 0 ? 'Nenhum instalador disponível' : 'Selecione um instalador');
+        isValid = false;
+      }
+
+      if (!data.pppoe) {
+        setError('pppoe', 'PPPoE é obrigatório');
+        isValid = false;
+      } else if (!isEdit) {
+        isValid = await checkDuplicate('pppoe', data.pppoe, 'pppoe-error', 'PPPoE já cadastrado') && isValid;
+      }
+
+      if (!data.password) {
+        setError('password', 'Senha PPPoE é obrigatória');
+        isValid = false;
+      }
+
+      return isValid;
+    }
+
+    async function saveClient() {
+      const clientData = getClientData();
+      if (!await validateClient(clientData)) return;
+
+      const btn = document.getElementById('saveBtn');
+      const originalHTML = btn.innerHTML;
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Salvando...';
+
+      try {
+        const response = await fetch('/system/api/clients.php', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(clientData)
+        });
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || `Erro HTTP ${response.status}`);
+        }
+        
+        addToRecentClients(clientData);
+        localStorage.removeItem('clientFormDraft');
+        
+        showModal('Sucesso', 'Cliente cadastrado com sucesso!', 'fas fa-check-circle text-green-600');
+        setTimeout(() => {
+          clearForm();
+        }, 1500);
+      } catch (error) {
+        showModal('Erro', 'Erro ao cadastrar cliente: ' + error.message, 'fas fa-exclamation-circle text-red-600');
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = originalHTML;
+      }
+    }
+
+    async function updateClient() {
+      const clientData = getClientData();
+      if (!await validateClient(clientData, true)) return;
+
+      const btn = document.getElementById('saveBtn');
+      const originalHTML = btn.innerHTML;
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Atualizando...';
+
+      try {
+        const response = await fetch(`/system/api/clients.php?cpf=${clientData.cpf}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(clientData)
+        });
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || `Erro HTTP ${response.status}`);
+        }
+        showModal('Sucesso', 'Cliente atualizado com sucesso!', 'fas fa-check-circle text-green-600');
+        setTimeout(() => window.location.href = '/system/clients.html', 1500);
+      } catch (error) {
+        showModal('Erro', 'Erro ao atualizar cliente: ' + error.message, 'fas fa-exclamation-circle text-red-600');
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = originalHTML;
+      }
+    }
+
+    function clearForm() {
+      document.getElementById('clientForm').reset();
+      clearErrors();
+      document.querySelectorAll('.input-valid').forEach(el => el.classList.remove('input-valid'));
+      document.getElementById('cpf').focus();
+      updateProgress();
+      localStorage.removeItem('clientFormDraft');
+    }
+
+    function loadEditClient() {
+      const urlParams = new URLSearchParams(window.location.search);
+      const isEdit = urlParams.get('edit') === 'true';
+      const editClient = localStorage.getItem('editClient');
+
+      if (isEdit && editClient) {
+        const client = JSON.parse(editClient);
+
+        document.getElementById('cpf').value = client.cpf;
+        document.getElementById('serial').value = client.serial;
+        document.getElementById('name').value = client.name;
+        document.getElementById('address').value = client.address;
+        document.getElementById('number').value = client.number || '';
+        document.getElementById('complement').value = client.complement || '';
+        document.getElementById('city').value = client.city || '';
+        document.getElementById('dueDay').value = client.dueDay || '';
+        document.getElementById('phone').value = client.phone || '';
+        document.getElementById('birthDate').value = client.birthDate || '';
+        document.getElementById('observation').value = client.observation || '';
+        document.getElementById('planId').value = client.planId || '';
+        document.getElementById('installer').value = client.installer || '';
+        document.getElementById('pppoe').value = client.pppoe;
+        document.getElementById('password').value = client.password;
+
+        document.querySelector('h2').innerHTML = '<i class="fas fa-user-edit text-blue-600"></i> Editar Cliente';
+        const saveBtn = document.getElementById('saveBtn');
+        saveBtn.innerHTML = '<i class="fas fa-save"></i> Atualizar';
+        saveBtn.onclick = updateClient;
+
+        localStorage.removeItem('editClient');
+      }
+    }
+
+    function initMobileMenu() {
+      const mobileMenuButton = document.getElementById('mobile-menu-button');
+      const closeMenuButton = document.getElementById('close-menu-button');
+      const mobileMenu = document.getElementById('mobile-menu');
+      const menuBackdrop = document.getElementById('menu-backdrop');
+
+      function openMenu() {
+        mobileMenu.classList.add('show');
+        menuBackdrop.classList.add('show');
+        document.body.style.overflow = 'hidden';
+      }
+
+      function closeMenu() {
+        mobileMenu.classList.remove('show');
+        menuBackdrop.classList.remove('show');
+        document.body.style.overflow = '';
+      }
+
+      mobileMenuButton.addEventListener('click', openMenu);
+      closeMenuButton.addEventListener('click', closeMenu);
+      menuBackdrop.addEventListener('click', closeMenu);
+
+      const mobileMenuLinks = mobileMenu.getElementsByTagName('a');
+      Array.from(mobileMenuLinks).forEach(link => {
+        link.addEventListener('click', closeMenu);
+      });
+
+      window.addEventListener('resize', () => {
+        if (window.innerWidth >= 1024) {
+          closeMenu();
+        }
+      });
+    }
+
+    // ===== INICIALIZAÇÃO =====
+    window.onload = function() {
+      loadPlans();
+      loadInstallers();
+      loadEditClient();
+      initMobileMenu();
+      initDraftSaving();
+      setupRealtimeValidation();
+      setupKeyboardShortcuts();
+      loadRecentClients();
+      updateProgress();
+    };
+  </script>
+</body>
+</html>

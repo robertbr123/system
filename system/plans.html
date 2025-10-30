@@ -1,0 +1,645 @@
+<script type="text/javascript">
+        var gk_isXlsx = false;
+        var gk_xlsxFileLookup = {};
+        var gk_fileData = {};
+        function filledCell(cell) {
+          return cell !== '' && cell != null;
+        }
+        function loadFileData(filename) {
+        if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
+            try {
+                var workbook = XLSX.read(gk_fileData[filename], { type: 'base64' });
+                var firstSheetName = workbook.SheetNames[0];
+                var worksheet = workbook.Sheets[firstSheetName];
+
+                // Convert sheet to JSON to filter blank rows
+                var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false, defval: '' });
+                // Filter out blank rows (rows where all cells are empty, null, or undefined)
+                var filteredData = jsonData.filter(row => row.some(filledCell));
+
+                // Heuristic to find the header row by ignoring rows with fewer filled cells than the next row
+                var headerRowIndex = filteredData.findIndex((row, index) =>
+                  row.filter(filledCell).length >= filteredData[index + 1]?.filter(filledCell).length
+                );
+                // Fallback
+                if (headerRowIndex === -1 || headerRowIndex > 25) {
+                  headerRowIndex = 0;
+                }
+
+                // Convert filtered JSON back to CSV
+                var csv = XLSX.utils.aoa_to_sheet(filteredData.slice(headerRowIndex)); // Create a new sheet from filtered array of arrays
+                csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
+                return csv;
+            } catch (e) {
+                console.error(e);
+                return "";
+            }
+        }
+        return gk_fileData[filename] || "";
+        }
+        </script><!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gerenciar Planos - Sistema ERP</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" integrity="sha512-iecdLmaskl7CVkqkXNQ/ZH/XLlvWZOJyj7Yy7tcenmpD1ypASozpmT/E0iPtmFIB46ZmdtAc9eNBvH0H/ZpiBw==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    body {
+      font-family: 'Poppins', sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+    }
+    .gradient-header {
+      background: rgba(255, 255, 255, 0.1);
+      backdrop-filter: blur(10px);
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    .nav-link {
+      position: relative;
+      transition: color 0.3s ease;
+    }
+    .nav-link::after {
+      content: '';
+      position: absolute;
+      width: 0;
+      height: 2px;
+      bottom: -2px;
+      left: 0;
+      background-color: #ffffff;
+      transition: width 0.3s ease;
+    }
+    .nav-link:hover::after {
+      width: 100%;
+    }
+    .btn-primary, .btn-edit, .btn-delete, .btn-cancel, .btn-clear, .btn-logout {
+      transition: transform 0.2s, background-color 0.2s, box-shadow 0.2s, filter 0.2s;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .btn-primary:hover, .btn-edit:hover, .btn-delete:hover, .btn-cancel:hover, .btn-clear:hover, .btn-logout:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
+      filter: brightness(1.1);
+    }
+    .plan-card {
+      transition: all 0.3s ease;
+      border-radius: 20px;
+      background: rgba(255, 255, 255, 0.95);
+      animation: fadeIn 0.5s ease-out;
+      animation-delay: calc(var(--index) * 0.1s);
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+    }
+    .plan-card:hover {
+      transform: translateY(-5px);
+      box-shadow: 0 15px 35px rgba(0, 0, 0, 0.2);
+    }
+    .plan-card strong {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+      font-size: 1.25rem;
+    }
+    .modal {
+      transition: opacity 0.3s ease-in-out, transform 0.3s ease-in-out;
+      transform: scale(0.95);
+    }
+    .modal.show {
+      transform: scale(1);
+    }
+    .input-icon {
+      position: relative;
+    }
+    .input-icon i {
+      position: absolute;
+      left: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: #6b7280;
+    }
+    .input-icon input {
+      padding-left: 48px;
+      border-radius: 12px;
+      transition: all 0.3s ease;
+      height: 50px;
+      border: 2px solid transparent;
+      background: rgba(255, 255, 255, 0.9);
+      font-size: 0.95rem;
+      color: #1a1a1a;
+    }
+    .input-icon input:focus {
+      border-color: #667eea;
+      background: white;
+      box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.1);
+    }
+    .input-icon i {
+      font-size: 1.2rem;
+      transition: color 0.3s ease;
+    }
+    .input-icon input:focus + i {
+      color: #667eea;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    @media (max-width: 640px) {
+      .container {
+        padding: 0 1rem;
+      }
+      input {
+        font-size: 0.85rem;
+        padding: 0.75rem 2.5rem;
+      }
+      .btn-primary, .btn-edit, .btn-delete, .btn-cancel, .btn-clear, .btn-logout {
+        font-size: 0.85rem;
+        padding: 0.75rem 1rem;
+      }
+      .plan-card {
+        font-size: 0.85rem;
+        padding: 0.75rem;
+      }
+      .modal > div {
+        width: 90%;
+      }
+    }
+  </style>
+</head>
+<script>
+  // Mobile menu functionality
+  document.addEventListener('DOMContentLoaded', () => {
+    const mobileMenuButton = document.getElementById('mobile-menu-button');
+    const closeMenuButton = document.getElementById('close-menu-button');
+    const mobileMenu = document.getElementById('mobile-menu');
+    const menuBackdrop = document.getElementById('menu-backdrop');
+
+    function toggleMenu() {
+      mobileMenu.classList.toggle('show');
+      menuBackdrop.classList.toggle('show');
+      document.body.classList.toggle('overflow-hidden');
+    }
+
+    mobileMenuButton.addEventListener('click', toggleMenu);
+    closeMenuButton.addEventListener('click', toggleMenu);
+    menuBackdrop.addEventListener('click', toggleMenu);
+  });
+</script>
+<body class="min-h-screen">
+    <!-- Menu Mobile Styles -->
+  <style>
+    .mobile-menu {
+      transform: translateX(-100%);
+      transition: transform 0.3s ease-in-out;
+    }
+    .mobile-menu.show {
+      transform: translateX(0);
+    }
+    .menu-backdrop {
+      transition: opacity 0.3s ease-in-out;
+      opacity: 0;
+      pointer-events: none;
+    }
+    .menu-backdrop.show {
+      opacity: 1;
+      pointer-events: auto;
+    }
+  </style>
+
+  <nav class="gradient-header p-4 shadow-md fixed w-full top-0 z-30">
+    <div class="max-w-7xl mx-auto flex justify-between items-center">
+      <h1 class="text-white text-xl sm:text-2xl font-bold flex items-center gap-2">
+        <i class="fas fa-globe"></i> Ondeline
+      </h1>
+
+      <!-- Menu Mobile Button -->
+      <button id="mobile-menu-button" class="lg:hidden text-white focus:outline-none">
+        <i class="fas fa-bars text-2xl"></i>
+      </button>
+
+      <!-- Desktop Menu -->
+      <div class="hidden lg:flex space-x-6 items-center">
+        <a href="/system/dashboard.html" class="nav-link text-white hover:text-gray-200 font-medium">Dashboard</a>
+        <a href="/system/index.html" class="nav-link text-white hover:text-gray-200 font-medium">Cadastro</a>
+        <a href="/system/clients.html" class="nav-link text-white hover:text-gray-200 font-medium">Clientes</a>
+        <a href="/system/stock.html" class="nav-link text-white hover:text-gray-200 font-medium">Estoque</a>
+        <a href="/system/barcode.html" class="nav-link text-white hover:text-gray-200 font-medium">Leitor</a>
+        <a href="/system/plans.html" class="nav-link text-white hover:text-gray-200 font-medium">Planos</a>
+        <a href="/system/installers.html" class="nav-link text-white hover:text-gray-200 font-medium">Instaladores</a>
+        <button onclick="logout()" class="bg-red-600 text-white p-2 rounded-lg hover:bg-red-700 flex items-center gap-2">
+          <i class="fas fa-sign-out-alt"></i> Sair
+        </button>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Mobile Menu Overlay -->
+  <div id="menu-backdrop" class="menu-backdrop fixed inset-0 bg-black/50 z-40 lg:hidden"></div>
+
+  <!-- Mobile Menu -->
+  <div id="mobile-menu" class="mobile-menu fixed left-0 top-0 h-full w-4/5 max-w-sm bg-white dark:bg-gray-800 z-50 lg:hidden overflow-y-auto">
+    <div class="p-4 border-b border-gray-200 dark:border-gray-700">
+      <div class="flex items-center justify-between">
+        <h2 class="text-xl font-semibold text-gray-800 dark:text-white">Menu</h2>
+        <button id="close-menu-button" class="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">
+          <i class="fas fa-times text-2xl"></i>
+        </button>
+      </div>
+    </div>
+    <nav class="p-4">
+      <ul class="space-y-4">
+        <li>
+          <a href="/system/dashboard.html" class="flex items-center gap-3 text-gray-700 dark:text-gray-200 hover:text-blue-600 dark:hover:text-blue-400 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700">
+            <i class="fas fa-chart-line w-5"></i>
+            <span>Dashboard</span>
+          </a>
+        </li>
+        <li>
+          <a href="/system/index.html" class="flex items-center gap-3 text-gray-700 dark:text-gray-200 hover:text-blue-600 dark:hover:text-blue-400 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700">
+            <i class="fas fa-plus-circle w-5"></i>
+            <span>Cadastro</span>
+          </a>
+        </li>
+        <li>
+          <a href="/system/clients.html" class="flex items-center gap-3 text-gray-700 dark:text-gray-200 hover:text-blue-600 dark:hover:text-blue-400 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700">
+            <i class="fas fa-users w-5"></i>
+            <span>Clientes</span>
+          </a>
+        </li>
+        <li>
+          <a href="/system/stock.html" class="flex items-center gap-3 text-gray-700 dark:text-gray-200 hover:text-blue-600 dark:hover:text-blue-400 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700">
+            <i class="fas fa-box w-5"></i>
+            <span>Estoque</span>
+          </a>
+        </li>
+        <li>
+          <a href="/system/barcode.html" class="flex items-center gap-3 text-gray-700 dark:text-gray-200 hover:text-blue-600 dark:hover:text-blue-400 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700">
+            <i class="fas fa-barcode w-5"></i>
+            <span>Leitor</span>
+          </a>
+        </li>
+        <li>
+          <a href="/system/plans.html" class="flex items-center gap-3 text-gray-700 dark:text-gray-200 hover:text-blue-600 dark:hover:text-blue-400 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700">
+            <i class="fas fa-list-alt w-5"></i>
+            <span>Planos</span>
+          </a>
+        </li>
+        <li>
+          <a href="/system/installers.html" class="flex items-center gap-3 text-gray-700 dark:text-gray-200 hover:text-blue-600 dark:hover:text-blue-400 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700">
+            <i class="fas fa-hard-hat w-5"></i>
+            <span>Instaladores</span>
+          </a>
+        </li>
+        <li>
+          <button onclick="logout()" class="flex items-center gap-3 text-white bg-red-600 hover:bg-red-700 p-2 rounded-lg mt-4 w-full">
+            <i class="fas fa-sign-out-alt w-5"></i>
+            <span>Sair</span>
+          </button>
+        </li>
+      </ul>
+    </nav>
+  </div>
+
+  <div class="mt-20 max-w-4xl mx-auto p-4 sm:p-6 container">
+    <div class="bg-white/95 p-6 sm:p-8 rounded-[20px] shadow-xl backdrop-blur-md border border-white/20">
+      <div class="mb-8 text-center">
+        <div class="text-5xl mb-4 text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-purple-600">
+          <i class="fas fa-box"></i>
+        </div>
+        <h2 class="text-2xl font-bold text-gray-800 mb-2">Planos Cadastrados</h2>
+        <p class="text-gray-600">Gerencie os planos disponíveis para seus clientes</p>
+      </div>
+      <div class="mb-6 grid gap-4 sm:grid-cols-2 sm:gap-6">
+        <div class="input-icon">
+          <input id="planName" type="text" placeholder="Nome do Plano" class="p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 w-full" />
+          <i class="fas fa-list"></i>
+        </div>
+        <div class="input-icon">
+          <input id="planPrice" type="number" step="0.01" placeholder="Preço (R$)" class="p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 w-full" />
+          <i class="fas fa-dollar-sign"></i>
+        </div>
+        <div class="flex flex-col sm:flex-row gap-4 justify-center sm:col-span-2">
+          <button onclick="addPlan()" class="btn-primary bg-green-600 text-white p-3 rounded-lg hover:bg-green-700">
+            <i class="fas fa-plus"></i> Cadastrar
+          </button>
+          <button onclick="clearForm()" class="btn-clear bg-gray-500 text-white p-3 rounded-lg hover:bg-gray-600">
+            <i class="fas fa-eraser"></i> Limpar
+          </button>
+        </div>
+      </div>
+      <p id="planCount" class="text-gray-600 mb-4 text-center">Total de Planos: 0</p>
+      <ul id="planList" class="space-y-4"></ul>
+    </div>
+
+    <div id="editPlanForm" class="mt-8 bg-white p-4 sm:p-6 rounded-xl shadow-lg hidden">
+      <h2 class="text-xl sm:text-2xl font-semibold text-gray-800 mb-6 text-center flex items-center justify-center gap-2">
+        <i class="fas fa-edit"></i> Editar Plano
+      </h2>
+      <div class="grid gap-4 sm:gap-6">
+        <input id="editPlanId" type="hidden" />
+        <div class="input-icon">
+          <input id="editPlanName" type="text" placeholder="Nome do Plano" class="p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 w-full" />
+          <i class="fas fa-list"></i>
+        </div>
+        <div class="input-icon">
+          <input id="editPlanPrice" type="number" step="0.01" placeholder="Preço (R$)" class="p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 w-full" />
+          <i class="fas fa-dollar-sign"></i>
+        </div>
+        <div class="flex flex-col sm:flex-row gap-4 justify-center">
+          <button onclick="savePlanEdit()" class="btn-primary bg-green-600 text-white p-3 rounded-lg hover:bg-green-700">
+            <i class="fas fa-save"></i> Salvar
+          </button>
+          <button onclick="clearEditPlanForm()" class="btn-clear bg-gray-500 text-white p-3 rounded-lg hover:bg-gray-600">
+            <i class="fas fa-eraser"></i> Limpar
+          </button>
+          <button onclick="cancelPlanEdit()" class="btn-cancel bg-red-600 text-white p-3 rounded-lg hover:bg-red-700">
+            <i class="fas fa-times"></i> Cancelar
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="modal" class="modal fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden">
+    <div class="bg-white p-6 rounded-lg shadow-xl max-w-md w-full sm:w-3/4">
+      <h3 id="modalTitle" class="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2"></h3>
+      <p id="modalMessage" class="text-gray-600 mb-6"></p>
+      <button onclick="closeModal()" class="bg-blue-600 text-white p-2 rounded-lg hover:bg-blue-700 w-full flex items-center justify-center gap-2">
+        <i class="fas fa-check"></i> OK
+      </button>
+    </div>
+  </div>
+
+  <script>
+    let allPlans = [];
+
+    async function checkAuth() {
+      try {
+        const response = await fetch('/system/api/check_auth.php');
+        const result = await response.json();
+        if (!response.ok || !result.authenticated) {
+          window.location.href = '/system/login.html';
+        } else {
+          loadPlans();
+        }
+      } catch (error) {
+        console.error('Erro ao verificar autenticação:', error);
+        window.location.href = '/system/login.html';
+      }
+    }
+
+    async function logout() {
+      try {
+        const response = await fetch('/system/api/logout.php', { method: 'POST' });
+        if (!response.ok) throw new Error('Erro ao fazer logout');
+        window.location.href = '/system/login.html';
+      } catch (error) {
+        console.error('Erro ao fazer logout:', error);
+        window.location.href = '/system/login.html';
+      }
+    }
+
+    function showModal(title, message, iconClass = 'fas fa-info-circle text-blue-600') {
+      document.getElementById('modalTitle').innerHTML = `<i class="${iconClass}"></i> ${title}`;
+      document.getElementById('modalMessage').textContent = message;
+      const modal = document.getElementById('modal');
+      modal.classList.remove('hidden');
+      modal.classList.add('show');
+      setTimeout(() => modal.classList.add('show'), 10);
+    }
+
+    function closeModal() {
+      const modal = document.getElementById('modal');
+      modal.classList.remove('show');
+      setTimeout(() => modal.classList.add('hidden'), 300);
+    }
+
+    function renderPlans(plans) {
+      const planList = document.getElementById('planList');
+      planList.innerHTML = '';
+      if (plans.length === 0) {
+        const li = document.createElement('li');
+        li.className = 'p-4 bg-gray-50 rounded-lg text-center text-gray-600';
+        li.textContent = 'Nenhum plano encontrado.';
+        planList.appendChild(li);
+      } else {
+        plans.forEach((plan, index) => {
+          const li = document.createElement('li');
+          li.className = 'plan-card p-4 bg-gray-50 rounded-lg shadow-sm';
+          li.style.setProperty('--index', index);
+          li.innerHTML = `
+            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+              <div class="flex items-center gap-3">
+                <i class="fas fa-list text-blue-600 text-xl"></i>
+                <div>
+                  <strong class="text-gray-800 text-lg">${plan.name}</strong><br>
+                  <span class="text-gray-600">Preço: R$${parseFloat(plan.price).toFixed(2)}</span>
+                </div>
+              </div>
+              <div class="flex gap-2">
+                <button onclick="editPlan(${plan.id}, '${plan.name.replace(/'/g, "\\'")}', ${plan.price})" class="btn-edit bg-blue-600 text-white p-2 rounded-lg hover:bg-blue-700">
+                  <i class="fas fa-edit"></i> Editar
+                </button>
+                <button onclick="deletePlan(${plan.id}, '${plan.name.replace(/'/g, "\\'")}')" class="btn-delete bg-red-600 text-white p-2 rounded-lg hover:bg-red-700">
+                  <i class="fas fa-trash"></i> Excluir
+                </button>
+              </div>
+            </div>
+          `;
+          planList.appendChild(li);
+        });
+      }
+      document.getElementById('planCount').textContent = `Total de Planos: ${plans.length}`;
+    }
+
+    async function loadPlans() {
+      try {
+        const response = await fetch('/system/api/plans.php');
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || `Erro HTTP ${response.status}`);
+        }
+        allPlans = await response.json();
+        renderPlans(allPlans);
+      } catch (error) {
+        console.error('Erro ao carregar planos:', error);
+        showModal('Erro', 'Erro ao carregar planos: ' + error.message, 'fas fa-exclamation-circle text-red-600');
+        if (error.message.includes('Não autenticado')) {
+          window.location.href = '/system/login.html';
+        }
+      }
+    }
+
+    async function addPlan() {
+      const planData = {
+        name: document.getElementById('planName').value.trim(),
+        price: document.getElementById('planPrice').value
+      };
+      if (!planData.name || !planData.price) {
+        showModal('Erro', 'Por favor, preencha todos os campos obrigatórios (Nome, Preço).', 'fas fa-exclamation-circle text-red-600');
+        return;
+      }
+      if (isNaN(planData.price) || planData.price < 0) {
+        showModal('Erro', 'Preço deve ser um número não negativo.', 'fas fa-exclamation-circle text-red-600');
+        return;
+      }
+      try {
+        const response = await fetch('/system/api/plans.php', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(planData)
+        });
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || `Erro HTTP ${response.status}`);
+        }
+        const result = await response.json();
+        if (result.error) throw new Error(result.error);
+        clearForm();
+        loadPlans();
+        showModal('Sucesso', 'Plano cadastrado com sucesso!', 'fas fa-check-circle text-green-600');
+      } catch (error) {
+        console.error('Erro ao cadastrar plano:', error);
+        showModal('Erro', 'Erro ao cadastrar plano: ' + error.message, 'fas fa-exclamation-circle text-red-600');
+        if (error.message.includes('Não autenticado')) {
+          window.location.href = '/system/login.html';
+        }
+      }
+    }
+
+    function editPlan(id, name, price) {
+      document.getElementById('editPlanId').value = id;
+      document.getElementById('editPlanName').value = name;
+      document.getElementById('editPlanPrice').value = price;
+      document.getElementById('editPlanForm').classList.remove('hidden');
+      document.getElementById('editPlanName').focus();
+    }
+
+    async function savePlanEdit() {
+      const planData = {
+        name: document.getElementById('editPlanName').value.trim(),
+        price: document.getElementById('editPlanPrice').value
+      };
+      const id = document.getElementById('editPlanId').value;
+      if (!planData.name || !planData.price) {
+        showModal('Erro', 'Por favor, preencha todos os campos obrigatórios (Nome, Preço).', 'fas fa-exclamation-circle text-red-600');
+        return;
+      }
+      if (isNaN(planData.price) || planData.price < 0) {
+        showModal('Erro', 'Preço deve ser um número não negativo.', 'fas fa-exclamation-circle text-red-600');
+        return;
+      }
+      try {
+        const response = await fetch(`/system/api/plans.php?id=${id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(planData)
+        });
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || `Erro HTTP ${response.status}`);
+        }
+        const result = await response.json();
+        if (result.error) throw new Error(result.error);
+        clearEditPlanForm();
+        loadPlans();
+        showModal('Sucesso', 'Plano atualizado com sucesso!', 'fas fa-check-circle text-green-600');
+      } catch (error) {
+        console.error('Erro ao atualizar plano:', error);
+        showModal('Erro', 'Erro ao atualizar plano: ' + error.message, 'fas fa-exclamation-circle text-red-600');
+        if (error.message.includes('Não autenticado')) {
+          window.location.href = '/system/login.html';
+        }
+      }
+    }
+
+    async function deletePlan(id, name) {
+      if (!confirm(`Tem certeza que deseja excluir o plano ${name}?`)) return;
+      try {
+        const response = await fetch(`/system/api/plans.php?id=${id}`, {
+          method: 'DELETE'
+        });
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || `Erro HTTP ${response.status}`);
+        }
+        const result = await response.json();
+        if (result.error) throw new Error(result.error);
+        loadPlans();
+        showModal('Sucesso', 'Plano excluído com sucesso!', 'fas fa-check-circle text-green-600');
+      } catch (error) {
+        console.error('Erro ao excluir plano:', error);
+        showModal('Erro', 'Erro ao excluir plano: ' + error.message, 'fas fa-exclamation-circle text-red-600');
+        if (error.message.includes('Não autenticado')) {
+          window.location.href = '/system/login.html';
+        }
+      }
+    }
+
+    function clearForm() {
+      document.getElementById('planName').value = '';
+      document.getElementById('planPrice').value = '';
+      document.getElementById('planName').focus();
+    }
+
+    function clearEditPlanForm() {
+      document.getElementById('editPlanId').value = '';
+      document.getElementById('editPlanName').value = '';
+      document.getElementById('editPlanPrice').value = '';
+      document.getElementById('editPlanForm').classList.add('hidden');
+    }
+
+    function cancelPlanEdit() {
+      clearEditPlanForm();
+    }
+
+    function initMobileMenu() {
+      const mobileMenuButton = document.getElementById('mobile-menu-button');
+      const closeMenuButton = document.getElementById('close-menu-button');
+      const mobileMenu = document.getElementById('mobile-menu');
+      const menuBackdrop = document.getElementById('menu-backdrop');
+
+      function openMenu() {
+        mobileMenu.classList.add('show');
+        menuBackdrop.classList.add('show');
+        document.body.style.overflow = 'hidden';
+      }
+
+      function closeMenu() {
+        mobileMenu.classList.remove('show');
+        menuBackdrop.classList.remove('show');
+        document.body.style.overflow = '';
+      }
+
+      mobileMenuButton.addEventListener('click', openMenu);
+      closeMenuButton.addEventListener('click', closeMenu);
+      menuBackdrop.addEventListener('click', closeMenu);
+
+      // Fechar menu ao clicar em um link
+      const mobileMenuLinks = mobileMenu.getElementsByTagName('a');
+      Array.from(mobileMenuLinks).forEach(link => {
+        link.addEventListener('click', closeMenu);
+      });
+
+      // Fechar menu ao redimensionar para desktop
+      window.addEventListener('resize', () => {
+        if (window.innerWidth >= 1024) {
+          closeMenu();
+        }
+      });
+    }
+
+    window.onload = function() {
+      checkAuth();
+      initMobileMenu();
+    };
+  </script>
+</body>
+</html>

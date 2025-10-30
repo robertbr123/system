@@ -1,0 +1,1059 @@
+<script type="text/javascript">
+        var gk_isXlsx = false;
+        var gk_xlsxFileLookup = {};
+        var gk_fileData = {};
+        function filledCell(cell) {
+          return cell !== '' && cell != null;
+        }
+        function loadFileData(filename) {
+        if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
+            try {
+                var workbook = XLSX.read(gk_fileData[filename], { type: 'base64' });
+                var firstSheetName = workbook.SheetNames[0];
+                var worksheet = workbook.Sheets[firstSheetName];
+
+                // Convert sheet to JSON to filter blank rows
+                var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false, defval: '' });
+                // Filter out blank rows (rows where all cells are empty, null, or undefined)
+                var filteredData = jsonData.filter(row => row.some(filledCell));
+
+                // Heuristic to find the header row by ignoring rows with fewer filled cells than the next row
+                var headerRowIndex = filteredData.findIndex((row, index) =>
+                  row.filter(filledCell).length >= filteredData[index + 1]?.filter(filledCell).length
+                );
+                // Fallback
+                if (headerRowIndex === -1 || headerRowIndex > 25) {
+                  headerRowIndex = 0;
+                }
+
+                // Convert filtered JSON back to CSV
+                var csv = XLSX.utils.aoa_to_sheet(filteredData.slice(headerRowIndex)); // Create a new sheet from filtered array of arrays
+                csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
+                return csv;
+            } catch (e) {
+                console.error(e);
+                return "";
+            }
+        }
+        return gk_fileData[filename] || "";
+        }
+        </script><!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Estoque - Sistema ERP</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" integrity="sha512-iecdLmaskl7CVkqkXNQ/ZH/XLlvWZOJyj7Yy7tcenmpD1ypASozpmT/E0iPtmFIB46ZmdtAc9eNBvH0H/ZpiBw==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    body {
+      font-family: 'Poppins', sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+    }
+    .gradient-header {
+      background: rgba(255, 255, 255, 0.1);
+      backdrop-filter: blur(10px);
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    .nav-link {
+      position: relative;
+      transition: color 0.3s ease;
+    }
+    .nav-link::after {
+      content: '';
+      position: absolute;
+      width: 0;
+      height: 2px;
+      bottom: -2px;
+      left: 0;
+      background-color: #ffffff;
+      transition: width 0.3s ease;
+    }
+    .nav-link:hover::after {
+      width: 100%;
+    }
+    .card {
+      background: rgba(255, 255, 255, 0.95);
+      border-radius: 20px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+      transition: all 0.3s ease;
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+    .card:hover {
+      transform: translateY(-5px);
+      box-shadow: 0 15px 35px rgba(0, 0, 0, 0.2);
+    }
+    .btn-primary {
+      transition: all 0.3s ease;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      font-weight: 600;
+      height: 50px;
+      font-size: 0.95rem;
+      letter-spacing: 0.5px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      border: none;
+      cursor: pointer;
+    }
+    .btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 20px rgba(102, 126, 234, 0.3);
+    }
+    .btn-primary:active {
+      transform: translateY(0);
+    }
+    .modal {
+      transition: opacity 0.3s ease-in-out, transform 0.3s ease-in-out;
+      transform: scale(0.95);
+      opacity: 0;
+    }
+    .modal.show {
+      transform: scale(1);
+      opacity: 1;
+    }
+    .input-group {
+      position: relative;
+      display: flex;
+      align-items: center;
+    }
+    .input-group input {
+      padding-right: 2.5rem;
+    }
+    .input-group .icon {
+      position: absolute;
+      right: 0.75rem;
+      color: #6b7280;
+    }
+    .input-group .icon.success {
+      color: #10b981;
+    }
+    .input-group .icon.error {
+      color: #dc2626;
+    }
+    @media (max-width: 640px) {
+      .container {
+        padding: 0 1rem;
+      }
+      .btn-primary {
+        font-size: 0.9rem;
+        padding: 0.75rem 1rem;
+      }
+      .card {
+        padding: 1rem;
+      }
+      .modal > div {
+        width: 95%;
+        padding: 1rem;
+      }
+      .grid-cols-3 {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body class="min-h-screen">
+  <!-- Menu Mobile Styles -->
+  <style>
+    .mobile-menu {
+      transform: translateX(-100%);
+      transition: transform 0.3s ease-in-out;
+    }
+    .mobile-menu.show {
+      transform: translateX(0);
+    }
+    .menu-backdrop {
+      transition: opacity 0.3s ease-in-out;
+      opacity: 0;
+      pointer-events: none;
+    }
+    .menu-backdrop.show {
+      opacity: 1;
+      pointer-events: auto;
+    }
+  </style>
+
+  <nav class="gradient-header p-4 shadow-md fixed w-full top-0 z-30">
+    <div class="max-w-7xl mx-auto flex justify-between items-center">
+      <h1 class="text-white text-xl sm:text-2xl font-bold flex items-center gap-2">
+        <i class="fas fa-globe"></i> Ondeline
+      </h1>
+
+      <!-- Menu Mobile Button -->
+      <button id="mobile-menu-button" class="lg:hidden text-white focus:outline-none">
+        <i class="fas fa-bars text-2xl"></i>
+      </button>
+
+      <!-- Desktop Menu -->
+      <div class="hidden lg:flex space-x-6 items-center">
+        <a href="/system/dashboard.html" class="nav-link text-white hover:text-gray-200 font-medium">Dashboard</a>
+        <a href="/system/index.html" class="nav-link text-white hover:text-gray-200 font-medium">Cadastro</a>
+        <a href="/system/clients.html" class="nav-link text-white hover:text-gray-200 font-medium">Clientes</a>
+        <a href="/system/stock.html" class="nav-link text-white hover:text-gray-200 font-medium">Estoque</a>
+        <a href="/system/barcode.html" class="nav-link text-white hover:text-gray-200 font-medium">Leitor</a>
+        <a href="/system/plans.html" class="nav-link text-white hover:text-gray-200 font-medium">Planos</a>
+        <a href="/system/installers.html" class="nav-link text-white hover:text-gray-200 font-medium">Instaladores</a>
+        <button onclick="logout()" class="bg-red-600 text-white p-2 rounded-lg hover:bg-red-700 flex items-center gap-2">
+          <i class="fas fa-sign-out-alt"></i> Sair
+        </button>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Mobile Menu Overlay -->
+  <div id="menu-backdrop" class="menu-backdrop fixed inset-0 bg-black/50 z-40 lg:hidden"></div>
+
+  <!-- Mobile Menu -->
+  <div id="mobile-menu" class="mobile-menu fixed left-0 top-0 h-full w-4/5 max-w-sm bg-white dark:bg-gray-800 z-50 lg:hidden overflow-y-auto">
+    <div class="p-4 border-b border-gray-200 dark:border-gray-700">
+      <div class="flex items-center justify-between">
+        <h2 class="text-xl font-semibold text-gray-800 dark:text-white">Menu</h2>
+        <button id="close-menu-button" class="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">
+          <i class="fas fa-times text-2xl"></i>
+        </button>
+      </div>
+    </div>
+    <nav class="p-4">
+      <ul class="space-y-4">
+        <li>
+          <a href="/system/dashboard.html" class="flex items-center gap-3 text-gray-700 dark:text-gray-200 hover:text-blue-600 dark:hover:text-blue-400 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700">
+            <i class="fas fa-chart-line w-5"></i>
+            <span>Dashboard</span>
+          </a>
+        </li>
+        <li>
+          <a href="/system/index.html" class="flex items-center gap-3 text-gray-700 dark:text-gray-200 hover:text-blue-600 dark:hover:text-blue-400 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700">
+            <i class="fas fa-plus-circle w-5"></i>
+            <span>Cadastro</span>
+          </a>
+        </li>
+        <li>
+          <a href="/system/clients.html" class="flex items-center gap-3 text-gray-700 dark:text-gray-200 hover:text-blue-600 dark:hover:text-blue-400 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700">
+            <i class="fas fa-users w-5"></i>
+            <span>Clientes</span>
+          </a>
+        </li>
+        <li>
+          <a href="/system/stock.html" class="flex items-center gap-3 text-gray-700 dark:text-gray-200 hover:text-blue-600 dark:hover:text-blue-400 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700">
+            <i class="fas fa-box w-5"></i>
+            <span>Estoque</span>
+          </a>
+        </li>
+        <li>
+          <a href="/system/barcode.html" class="flex items-center gap-3 text-gray-700 dark:text-gray-200 hover:text-blue-600 dark:hover:text-blue-400 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700">
+            <i class="fas fa-barcode w-5"></i>
+            <span>Leitor</span>
+          </a>
+        </li>
+        <li>
+          <a href="/system/plans.html" class="flex items-center gap-3 text-gray-700 dark:text-gray-200 hover:text-blue-600 dark:hover:text-blue-400 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700">
+            <i class="fas fa-list-alt w-5"></i>
+            <span>Planos</span>
+          </a>
+        </li>
+        <li>
+          <a href="/system/installers.html" class="flex items-center gap-3 text-gray-700 dark:text-gray-200 hover:text-blue-600 dark:hover:text-blue-400 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700">
+            <i class="fas fa-hard-hat w-5"></i>
+            <span>Instaladores</span>
+          </a>
+        </li>
+        <li>
+          <button onclick="logout()" class="flex items-center gap-3 text-white bg-red-600 hover:bg-red-700 p-2 rounded-lg mt-4 w-full">
+            <i class="fas fa-sign-out-alt w-5"></i>
+            <span>Sair</span>
+          </button>
+        </li>
+      </ul>
+    </nav>
+  </div>
+
+  <div class="mt-20 max-w-7xl mx-auto p-4 sm:p-6 container">
+    <div class="mb-8 text-center">
+      <div class="text-5xl mb-4 text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-purple-600">
+        <i class="fas fa-warehouse"></i>
+      </div>
+      <h2 class="text-2xl font-bold text-gray-800 mb-2">Gerenciamento de Estoque</h2>
+      <p class="text-gray-600">Controle seu inventário e movimentações de produtos</p>
+    </div>
+
+    <!-- Formulário para Adicionar Item -->
+    <div class="card p-6 mb-6">
+      <h3 class="text-lg font-semibold text-gray-800 mb-4">Adicionar Novo Item</h3>
+      <form id="addItemForm" class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div class="input-group">
+          <input type="text" id="itemName" placeholder="Nome do Item" class="w-full p-4 border-2 border-transparent rounded-xl focus:outline-none focus:border-blue-500 bg-white/90 transition-all" required aria-label="Nome do item">
+          <i class="fas fa-box text-gray-400"></i>
+        </div>
+        <div class="input-group">
+          <input type="text" id="itemBarcodes" placeholder="Códigos de Barras (separados por vírgula)" class="w-full p-4 border-2 border-transparent rounded-xl focus:outline-none focus:border-blue-500 bg-white/90 transition-all" required aria-label="Códigos de barras">
+          <i class="fas fa-barcode text-gray-400"></i>
+        </div>
+        <div class="input-group">
+          <input type="number" id="itemQuantity" placeholder="Quantidade Inicial" class="w-full p-4 border-2 border-transparent rounded-xl focus:outline-none focus:border-blue-500 bg-white/90 transition-all" required min="0" aria-label="Quantidade inicial">
+          <i class="fas fa-boxes text-gray-400"></i>
+        </div>
+        <div class="input-group">
+          <input type="number" id="minQuantity" placeholder="Estoque Mínimo" class="w-full p-4 border-2 border-transparent rounded-xl focus:outline-none focus:border-blue-500 bg-white/90 transition-all" required min="0" aria-label="Estoque mínimo">
+          <i class="fas fa-exclamation-triangle text-gray-400"></i>
+        </div>
+        <button type="submit" class="btn-primary bg-blue-600 text-white p-3 rounded-lg hover:bg-blue-700 col-span-1 sm:col-span-2">
+          <i class="fas fa-plus"></i> Adicionar Item
+        </button>
+      </form>
+    </div>
+
+    <!-- Botão de Importação em Massa -->
+    <div class="card p-6 mb-6">
+      <h3 class="text-lg font-semibold text-gray-800 mb-4">Importar Itens em Massa</h3>
+      <div class="flex flex-col sm:flex-row gap-4 items-center">
+        <input type="file" id="importFile" accept=".csv,.xlsx,.xls" class="flex-1 p-3 border-2 border-dashed border-blue-300 rounded-lg cursor-pointer" aria-label="Arquivo para importação">
+        <button onclick="importItems()" class="btn-primary bg-green-600 text-white p-3 rounded-lg hover:bg-green-700">
+          <i class="fas fa-upload"></i> Importar
+        </button>
+        <a href="#" onclick="downloadTemplate(); return false;" class="text-blue-600 hover:text-blue-800 flex items-center gap-2">
+          <i class="fas fa-file-csv"></i> Baixar Modelo
+        </a>
+      </div>
+      <p class="text-gray-600 mt-3 text-sm">Formato esperado: CSV com colunas <strong>nome, codigos_barras, quantidade, estoque_minimo</strong></p>
+    </div>
+
+    <!-- Formulário para Adicionar Movimentação -->
+    <div class="card p-6 mb-6">
+      <h3 class="text-lg font-semibold text-gray-800 mb-4">Adicionar Movimentação</h3>
+      <form id="addMovementForm" class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div class="input-group">
+          <select id="movementItemId" class="w-full p-4 border-2 border-transparent rounded-xl focus:outline-none focus:border-blue-500 bg-white/90 transition-all" required aria-label="Item">
+            <option value="">Selecione o Item</option>
+          </select>
+          <i class="fas fa-box-open text-gray-400"></i>
+        </div>
+        <div class="input-group">
+          <select id="movementInstaller" class="w-full p-4 border-2 border-transparent rounded-xl focus:outline-none focus:border-blue-500 bg-white/90 transition-all" required aria-label="Instalador">
+            <option value="">Selecione o Instalador</option>
+          </select>
+          <i class="fas fa-user-cog text-gray-400"></i>
+        </div>
+        <div class="input-group">
+          <input type="text" id="movementClientCpf" placeholder="CPF do Cliente" class="w-full p-4 border-2 border-transparent rounded-xl focus:outline-none focus:border-blue-500 bg-white/90 transition-all" required aria-label="CPF do cliente">
+          <i id="movementCpfIcon" class="fas fa-circle-notch fa-spin icon hidden"></i>
+        </div>
+        <p id="movementClientName" class="text-gray-600"></p>
+        <select id="movementType" class="p-3 border rounded-lg focus:outline-none" required aria-label="Tipo de movimentação">
+          <option value="">Tipo de Movimentação</option>
+          <option value="entry">Entrada</option>
+          <option value="exit">Saída</option>
+        </select>
+        <input type="number" id="movementQuantity" placeholder="Quantidade" class="p-3 border rounded-lg focus:outline-none" required min="1" aria-label="Quantidade">
+        <button type="submit" class="btn-primary bg-blue-600 text-white p-3 rounded-lg hover:bg-blue-700 col-span-1 sm:col-span-3">
+          <i class="fas fa-exchange-alt"></i> Registrar Movimentação
+        </button>
+      </form>
+    </div>
+
+    <!-- Tabela de Estoque -->
+    <div class="card p-6 mb-6">
+      <h3 class="text-lg font-semibold text-gray-800 mb-4">Itens em Estoque</h3>
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm text-left text-gray-600">
+          <thead class="text-xs uppercase bg-gradient-to-r from-blue-600/10 to-purple-600/10">
+            <tr>
+              <th class="px-6 py-4 font-semibold text-gray-700">Nome</th>
+              <th class="px-6 py-4 font-semibold text-gray-700">Códigos de Barras</th>
+              <th class="px-6 py-4 font-semibold text-gray-700">Quantidade</th>
+              <th class="px-6 py-4 font-semibold text-gray-700">Estoque Mínimo</th>
+              <th class="px-6 py-4 font-semibold text-gray-700">Ações</th>
+            </tr>
+          </thead>
+          <tbody id="stockTableBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Tabela de Movimentações -->
+    <div class="card p-6 mb-6">
+      <h3 class="text-lg font-semibold text-gray-800 mb-4">Movimentações</h3>
+      
+      <!-- Filtros Avançados -->
+      <div class="mb-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
+        <h4 class="font-semibold text-gray-700 mb-4">Filtros Avançados</h4>
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Data Inicial</label>
+            <input type="date" id="filterStartDate" class="w-full p-2 border rounded-lg focus:outline-none focus:border-blue-500">
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Data Final</label>
+            <input type="date" id="filterEndDate" class="w-full p-2 border rounded-lg focus:outline-none focus:border-blue-500">
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Tipo</label>
+            <select id="filterType" class="w-full p-2 border rounded-lg focus:outline-none focus:border-blue-500">
+              <option value="">Todos</option>
+              <option value="entry">Entrada</option>
+              <option value="exit">Saída</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Instalador</label>
+            <input type="text" id="filterInstallerAdvanced" placeholder="Nome do instalador" class="w-full p-2 border rounded-lg focus:outline-none focus:border-blue-500">
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Cliente (CPF)</label>
+            <input type="text" id="filterClientId" placeholder="CPF do cliente" class="w-full p-2 border rounded-lg focus:outline-none focus:border-blue-500">
+          </div>
+        </div>
+        <div class="flex gap-2 mt-4">
+          <button onclick="applyAdvancedFilters()" class="btn-primary bg-blue-600 text-white p-2 rounded-lg hover:bg-blue-700 text-sm">
+            <i class="fas fa-search"></i> Filtrar
+          </button>
+          <button onclick="clearAdvancedFilters()" class="btn-primary bg-gray-600 text-white p-2 rounded-lg hover:bg-gray-700 text-sm">
+            <i class="fas fa-times"></i> Limpar
+          </button>
+        </div>
+      </div>
+
+      <div class="mb-4">
+        <select id="filterInstaller" class="p-3 border rounded-lg focus:outline-none" aria-label="Filtrar por instalador">
+          <option value="">Todos os Instaladores</option>
+        </select>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm text-left text-gray-600">
+          <thead class="text-xs text-gray-700 uppercase bg-gray-100">
+            <tr>
+              <th class="px-4 py-3">Item</th>
+              <th class="px-4 py-3">Instalador</th>
+              <th class="px-4 py-3">Cliente</th>
+              <th class="px-4 py-3">Tipo</th>
+              <th class="px-4 py-3">Quantidade</th>
+              <th class="px-4 py-3">Data</th>
+            </tr>
+          </thead>
+          <tbody id="movementsTableBody"></tbody>
+        </table>
+      </div>
+      
+      <!-- Paginação -->
+      <div id="paginationControls" class="mt-4 flex justify-center items-center gap-2"></div>
+    </div>
+
+    <!-- Modal -->
+    <div id="modal" class="modal fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden">
+      <div class="bg-white p-6 rounded-lg shadow-xl max-w-md w-full sm:w-3/4">
+        <h3 id="modalTitle" class="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2"></h3>
+        <p id="modalMessage" class="text-gray-600 mb-6"></p>
+        <button onclick="closeModal()" class="bg-blue-600 text-white p-2 rounded-lg hover:bg-blue-700 w-full flex items-center justify-center gap-2">
+          <i class="fas fa-check"></i> OK
+        </button>
+      </div>
+    </div>
+
+    <!-- Modal de Edição de Item -->
+    <div id="editItemModal" class="modal fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden z-50">
+      <div class="bg-white p-6 rounded-lg shadow-xl max-w-md w-full sm:w-3/4 max-h-96 overflow-y-auto">
+        <h3 class="text-lg font-semibold text-gray-800 mb-4">Editar Item</h3>
+        <form id="editItemForm" class="space-y-4">
+          <input type="hidden" id="editItemId">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Nome do Item</label>
+            <input type="text" id="editItemName" class="w-full p-2 border rounded-lg focus:outline-none focus:border-blue-500" required>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Códigos de Barras (separados por vírgula)</label>
+            <input type="text" id="editItemBarcodes" class="w-full p-2 border rounded-lg focus:outline-none focus:border-blue-500" required>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Quantidade</label>
+            <input type="number" id="editItemQuantity" class="w-full p-2 border rounded-lg focus:outline-none focus:border-blue-500" required min="0">
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Estoque Mínimo</label>
+            <input type="number" id="editItemMinQuantity" class="w-full p-2 border rounded-lg focus:outline-none focus:border-blue-500" required min="0">
+          </div>
+          <div class="flex gap-2">
+            <button type="submit" class="flex-1 bg-blue-600 text-white p-2 rounded-lg hover:bg-blue-700">
+              <i class="fas fa-save"></i> Salvar
+            </button>
+            <button type="button" onclick="closeEditModal()" class="flex-1 bg-gray-600 text-white p-2 rounded-lg hover:bg-gray-700">
+              <i class="fas fa-times"></i> Cancelar
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function showModal(title, message, iconClass = 'fas fa-info-circle text-blue-600') {
+      document.getElementById('modalTitle').innerHTML = `<i class="${iconClass}"></i> ${title}`;
+      document.getElementById('modalMessage').textContent = message;
+      const modal = document.getElementById('modal');
+      modal.classList.remove('hidden');
+      modal.classList.add('show');
+      setTimeout(() => modal.classList.add('show'), 10);
+    }
+
+    function closeModal() {
+      const modal = document.getElementById('modal');
+      modal.classList.remove('show');
+      setTimeout(() => modal.classList.add('hidden'), 300);
+    }
+
+    async function checkAuth() {
+      try {
+        const response = await fetch('/system/api/stock.php?action=check_auth');
+        if (!response.ok) throw new Error(`Erro HTTP ${response.status}: ${await response.text()}`);
+        const result = await response.json();
+        if (result.error) {
+          throw new Error(result.error);
+        }
+        return true;
+      } catch (error) {
+        showModal('Erro', 'Você não está autenticado. Redirecionando para o login...', 'fas fa-exclamation-triangle text-red-600');
+        setTimeout(() => {
+          window.location.href = '/system/index.html';
+        }, 2000);
+        return false;
+      }
+    }
+
+    async function loadStock() {
+      try {
+        const response = await fetch('/system/api/stock.php?action=list_items');
+        if (!response.ok) throw new Error(`Erro HTTP ${response.status}: ${await response.text()}`);
+        const items = await response.json();
+        const tbody = document.getElementById('stockTableBody');
+        const itemSelect = document.getElementById('movementItemId');
+        itemSelect.innerHTML = '<option value="">Selecione o Item</option>';
+        tbody.innerHTML = '';
+        items.forEach(item => {
+          const row = document.createElement('tr');
+          row.innerHTML = `
+            <td class="px-4 py-2">${item.name}</td>
+            <td class="px-4 py-2">${item.barcodes || '-'}</td>
+            <td class="px-4 py-2">${item.quantity}</td>
+            <td class="px-4 py-2">${item.min_quantity}</td>
+            <td class="px-4 py-2">
+              <div class="flex gap-2">
+                <button onclick="openEditModal(${item.id}, '${item.name.replace(/'/g, "\\'")}', '${(item.barcodes || '').replace(/'/g, "\\'")}', ${item.quantity}, ${item.min_quantity})" class="text-blue-600 hover:text-blue-800 text-sm font-medium flex items-center gap-1">
+                  <i class="fas fa-edit"></i> Editar
+                </button>
+                <button onclick="deleteItem(${item.id})" class="text-red-600 hover:text-red-800 text-sm font-medium flex items-center gap-1">
+                  <i class="fas fa-trash"></i> Deletar
+                </button>
+              </div>
+            </td>
+          `;
+          tbody.appendChild(row);
+          const option = document.createElement('option');
+          option.value = item.id;
+          option.textContent = item.name;
+          itemSelect.appendChild(option);
+        });
+      } catch (error) {
+        showModal('Erro', `Erro ao carregar estoque: ${error.message}`, 'fas fa-exclamation-triangle text-red-600');
+      }
+    }
+
+    async function loadInstallers() {
+      try {
+        const response = await fetch('/system/api/installers.php');
+        if (!response.ok) throw new Error(`Erro ao carregar instaladores: ${response.statusText}`);
+        const installers = await response.json();
+        const installerSelect = document.getElementById('movementInstaller');
+        const filterSelect = document.getElementById('filterInstaller');
+        filterSelect.innerHTML = '<option value="">Todos os Instaladores</option>';
+        installerSelect.innerHTML = '<option value="">Selecione o Instalador</option>';
+        installers.forEach(installer => {
+          const option = document.createElement('option');
+          option.value = installer.name;
+          option.textContent = installer.name;
+          installerSelect.appendChild(option.cloneNode(true));
+          filterSelect.appendChild(option);
+        });
+      } catch (error) {
+        showModal('Erro', `Erro ao carregar instaladores: ${error.message}`, 'fas fa-exclamation-triangle text-red-600');
+      }
+    }
+
+    async function loadMovements(installer = '') {
+      try {
+        const response = await fetch(`/system/api/stock.php?action=get_movements_by_installer&installer=${encodeURIComponent(installer)}`);
+        if (!response.ok) throw new Error(`Erro HTTP ${response.status}: ${await response.text()}`);
+        const movements = await response.json();
+        const tbody = document.getElementById('movementsTableBody');
+        tbody.innerHTML = '';
+        movements.forEach(m => {
+          const row = document.createElement('tr');
+          row.innerHTML = `
+            <td class="px-4 py-2">${m.item_name}</td>
+            <td class="px-4 py-2">${m.installer}</td>
+            <td class="px-4 py-2">${m.client_name || m.client_id || '-'}</td>
+            <td class="px-4 py-2">${m.type === 'entry' ? 'Entrada' : 'Saída'}</td>
+            <td class="px-4 py-2">${m.quantity}</td>
+            <td class="px-4 py-2">${new Date(m.movement_date).toLocaleString('pt-BR')}</td>
+          `;
+          tbody.appendChild(row);
+        });
+      } catch (error) {
+        showModal('Erro', `Erro ao carregar movimentações: ${error.message}`, 'fas fa-exclamation-triangle text-red-600');
+      }
+    }
+
+    async function validateClientCpf(cpf) {
+      const cpfIcon = document.getElementById('movementCpfIcon');
+      cpfIcon.classList.remove('fa-check', 'fa-times', 'success', 'error');
+      cpfIcon.classList.add('fa-circle-notch', 'fa-spin', 'icon');
+      try {
+        const response = await fetch(`/system/api/stock.php?action=get_client_by_cpf&cpf=${encodeURIComponent(cpf)}`);
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(`Erro HTTP ${response.status}: ${errorText || response.statusText}`);
+        }
+        const client = await response.json();
+        if (client.error) {
+          throw new Error(client.error);
+        }
+        document.getElementById('movementClientName').textContent = `Cliente: ${client.name}`;
+        cpfIcon.classList.remove('fa-circle-notch', 'fa-spin');
+        cpfIcon.classList.add('fa-check', 'success', 'icon');
+        return true;
+      } catch (error) {
+        document.getElementById('movementClientName').textContent = '';
+        cpfIcon.classList.remove('fa-circle-notch', 'fa-spin');
+        cpfIcon.classList.add('fa-times', 'error', 'icon');
+        showModal('Erro', `Cliente não encontrado: ${error.message}`, 'fas fa-exclamation-triangle text-red-600');
+        return false;
+      }
+    }
+
+    document.getElementById('addItemForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const name = document.getElementById('itemName').value.trim();
+      const barcodesInput = document.getElementById('itemBarcodes').value.trim();
+      const quantity = document.getElementById('itemQuantity').value;
+      const minQuantity = document.getElementById('minQuantity').value;
+      const barcodes = barcodesInput.split(',').map(b => b.trim()).filter(b => b !== '');
+      if (barcodes.length === 0) {
+        showModal('Erro', 'Insira pelo menos um código de barras.', 'fas fa-exclamation-triangle text-red-600');
+        return;
+      }
+      try {
+        const response = await fetch('/system/api/stock.php?action=add_item', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name, barcodes, quantity, min_quantity: minQuantity })
+        });
+        if (!response.ok) throw new Error(`Erro HTTP ${response.status}: ${await response.text()}`);
+        const result = await response.json();
+        if (result.error) throw new Error(result.error);
+        showModal('Sucesso', 'Item adicionado com sucesso!', 'fas fa-check-circle text-green-600');
+        document.getElementById('addItemForm').reset();
+        loadStock();
+      } catch (error) {
+        showModal('Erro', `Erro ao adicionar item: ${error.message}`, 'fas fa-exclamation-triangle text-red-600');
+      }
+    });
+
+    document.getElementById('addMovementForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const itemId = document.getElementById('movementItemId').value;
+      const installer = document.getElementById('movementInstaller').value;
+      const clientCpf = document.getElementById('movementClientCpf').value.trim();
+      const type = document.getElementById('movementType').value;
+      const quantity = document.getElementById('movementQuantity').value;
+      if (!clientCpf) {
+        showModal('Erro', 'Por favor, insira o CPF do cliente.', 'fas fa-exclamation-triangle text-red-600');
+        return;
+      }
+      const isClientValid = await validateClientCpf(clientCpf);
+      if (!isClientValid) return;
+      try {
+        const response = await fetch('/system/api/stock.php?action=add_movement', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ item_id: itemId, installer, type, quantity, client_id: clientCpf })
+        });
+        if (!response.ok) throw new Error(`Erro HTTP ${response.status}: ${await response.text()}`);
+        const result = await response.json();
+        if (result.error) throw new Error(result.error);
+        showModal('Sucesso', 'Movimentação registrada com sucesso!', 'fas fa-check-circle text-green-600');
+        document.getElementById('addMovementForm').reset();
+        document.getElementById('movementClientName').textContent = '';
+        document.getElementById('movementCpfIcon').classList.add('hidden');
+        loadStock();
+        loadMovements(document.getElementById('filterInstaller').value);
+      } catch (error) {
+        showModal('Erro', `Erro ao registrar movimentação: ${error.message}`, 'fas fa-exclamation-triangle text-red-600');
+      }
+    });
+
+    document.getElementById('movementClientCpf').addEventListener('blur', async (e) => {
+      const cpf = e.target.value.trim();
+      if (cpf) {
+        await validateClientCpf(cpf);
+      } else {
+        document.getElementById('movementClientName').textContent = '';
+        document.getElementById('movementCpfIcon').classList.add('hidden');
+      }
+    });
+
+    document.getElementById('filterInstaller').addEventListener('change', (e) => {
+      loadMovements(e.target.value);
+    });
+
+    function openEditModal(id, name, barcodes, quantity, minQuantity) {
+      document.getElementById('editItemId').value = id;
+      document.getElementById('editItemName').value = name;
+      document.getElementById('editItemBarcodes').value = barcodes;
+      document.getElementById('editItemQuantity').value = quantity;
+      document.getElementById('editItemMinQuantity').value = minQuantity;
+      
+      const modal = document.getElementById('editItemModal');
+      modal.classList.remove('hidden');
+      setTimeout(() => modal.classList.add('show'), 10);
+    }
+
+    function closeEditModal() {
+      const modal = document.getElementById('editItemModal');
+      modal.classList.remove('show');
+      setTimeout(() => modal.classList.add('hidden'), 300);
+    }
+
+    async function deleteItem(id) {
+      if (!confirm('Tem certeza que deseja deletar este item? Esta ação é irreversível.')) {
+        return;
+      }
+      
+      try {
+        const response = await fetch('/system/api/stock.php?action=delete_item', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id })
+        });
+        if (!response.ok) throw new Error(`Erro HTTP ${response.status}: ${await response.text()}`);
+        const result = await response.json();
+        if (result.error) throw new Error(result.error);
+        showModal('Sucesso', 'Item deletado com sucesso!', 'fas fa-check-circle text-green-600');
+        loadStock();
+      } catch (error) {
+        showModal('Erro', `Erro ao deletar item: ${error.message}`, 'fas fa-exclamation-triangle text-red-600');
+      }
+    }
+
+    document.getElementById('editItemForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const id = document.getElementById('editItemId').value;
+      const name = document.getElementById('editItemName').value.trim();
+      const barcodesInput = document.getElementById('editItemBarcodes').value.trim();
+      const quantity = document.getElementById('editItemQuantity').value;
+      const minQuantity = document.getElementById('editItemMinQuantity').value;
+      const barcodes = barcodesInput.split(',').map(b => b.trim()).filter(b => b !== '');
+      
+      if (barcodes.length === 0) {
+        showModal('Erro', 'Insira pelo menos um código de barras.', 'fas fa-exclamation-triangle text-red-600');
+        return;
+      }
+      
+      try {
+        const response = await fetch('/system/api/stock.php?action=edit_item', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id, name, barcodes, quantity, min_quantity: minQuantity })
+        });
+        if (!response.ok) throw new Error(`Erro HTTP ${response.status}: ${await response.text()}`);
+        const result = await response.json();
+        if (result.error) throw new Error(result.error);
+        showModal('Sucesso', 'Item atualizado com sucesso!', 'fas fa-check-circle text-green-600');
+        closeEditModal();
+        loadStock();
+      } catch (error) {
+        showModal('Erro', `Erro ao atualizar item: ${error.message}`, 'fas fa-exclamation-triangle text-red-600');
+      }
+    });
+
+    async function importItems() {
+      const fileInput = document.getElementById('importFile');
+      const file = fileInput.files[0];
+      
+      if (!file) {
+        showModal('Erro', 'Selecione um arquivo para importar.', 'fas fa-exclamation-triangle text-red-600');
+        return;
+      }
+      
+      // Validar tipo de arquivo
+      const validExtensions = ['csv', 'xlsx', 'xls'];
+      const fileExt = file.name.split('.').pop().toLowerCase();
+      
+      if (!validExtensions.includes(fileExt)) {
+        showModal('Erro', `Tipo de arquivo inválido. Envie CSV, XLSX ou XLS.`, 'fas fa-exclamation-triangle text-red-600');
+        return;
+      }
+      
+      // Validar tamanho (max 10MB)
+      const maxSize = 10 * 1024 * 1024;
+      if (file.size > maxSize) {
+        showModal('Erro', `Arquivo muito grande. Máximo permitido: 10MB`, 'fas fa-exclamation-triangle text-red-600');
+        return;
+      }
+      
+      const formData = new FormData();
+      formData.append('file', file);
+      
+      try {
+        // Mostrar status de carregamento
+        const button = event.target;
+        const originalText = button.innerHTML;
+        button.disabled = true;
+        button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Importando...';
+        
+        const response = await fetch('/system/api/stock.php?action=import_items', {
+          method: 'POST',
+          body: formData
+        });
+        
+        // Tentar extrair texto da resposta primeiro para debug
+        const responseText = await response.text();
+        
+        // Verificar se é JSON válido
+        let result;
+        try {
+          result = JSON.parse(responseText);
+        } catch (parseError) {
+          button.disabled = false;
+          button.innerHTML = originalText;
+          showModal('Erro', `Resposta inválida do servidor. Detalhes:\n${responseText.substring(0, 200)}`, 'fas fa-exclamation-triangle text-red-600');
+          return;
+        }
+        
+        button.disabled = false;
+        button.innerHTML = originalText;
+        
+        if (!response.ok) {
+          throw new Error(result.error || `Erro HTTP ${response.status}`);
+        }
+        
+        // Preparar mensagem com detalhes
+        let message = `${result.imported} de ${result.total} itens importados com sucesso!`;
+        
+        if (result.errors && result.errors.length > 0) {
+          message += `\n\nErros encontrados:\n`;
+          const maxErrorsToShow = 5;
+          for (let i = 0; i < Math.min(maxErrorsToShow, result.errors.length); i++) {
+            message += `• ${result.errors[i]}\n`;
+          }
+          if (result.errors.length > maxErrorsToShow) {
+            message += `\n... e mais ${result.errors.length - maxErrorsToShow} erros`;
+          }
+        }
+        
+        showModal(
+          result.imported > 0 ? 'Sucesso' : 'Aviso', 
+          message, 
+          result.imported > 0 ? 'fas fa-check-circle text-green-600' : 'fas fa-exclamation-circle text-yellow-600'
+        );
+        
+        if (result.imported > 0) {
+          fileInput.value = '';
+          loadStock();
+        }
+      } catch (error) {
+        button.disabled = false;
+        button.innerHTML = originalText;
+        showModal('Erro', `Erro ao importar itens: ${error.message}`, 'fas fa-exclamation-triangle text-red-600');
+      }
+    }
+
+    function downloadTemplate() {
+      const csv = `nome,codigos_barras,quantidade,estoque_minimo
+Equipamento ONU,12345,10,5
+Roteador ONU,67890,15,8
+Splitter Ótico,11111,20,10
+Fusível,22222,100,50
+Conector SC/APC,33333,200,100
+Cabo Óptico 50m,44444,30,15
+Cabo Óptico 100m,55555,25,10
+Adaptador SC,66666,150,75
+POE Injector,77777,8,4
+Switch 5 portas,88888,12,6`;
+      
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      const url = URL.createObjectURL(blob);
+      
+      link.setAttribute('href', url);
+      link.setAttribute('download', 'template_estoque.csv');
+      link.style.visibility = 'hidden';
+      
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+
+    let currentPage = 1;
+    let currentFilters = {};
+
+    async function applyAdvancedFilters() {
+      const startDate = document.getElementById('filterStartDate').value;
+      const endDate = document.getElementById('filterEndDate').value;
+      const type = document.getElementById('filterType').value;
+      const installer = document.getElementById('filterInstallerAdvanced').value;
+      const clientId = document.getElementById('filterClientId').value;
+      
+      currentFilters = { startDate, endDate, type, installer, clientId };
+      currentPage = 1;
+      await loadFilteredMovements(1);
+    }
+
+    function clearAdvancedFilters() {
+      document.getElementById('filterStartDate').value = '';
+      document.getElementById('filterEndDate').value = '';
+      document.getElementById('filterType').value = '';
+      document.getElementById('filterInstallerAdvanced').value = '';
+      document.getElementById('filterClientId').value = '';
+      
+      currentFilters = {};
+      currentPage = 1;
+      loadMovements('');
+    }
+
+    async function loadFilteredMovements(page = 1) {
+      try {
+        const params = new URLSearchParams();
+        params.append('action', 'get_movements_filtered');
+        params.append('page', page);
+        params.append('limit', 50);
+        
+        if (currentFilters.startDate) params.append('start_date', currentFilters.startDate);
+        if (currentFilters.endDate) params.append('end_date', currentFilters.endDate);
+        if (currentFilters.type) params.append('type', currentFilters.type);
+        if (currentFilters.installer) params.append('installer', currentFilters.installer);
+        if (currentFilters.clientId) params.append('client_id', currentFilters.clientId);
+        
+        const response = await fetch(`/system/api/stock.php?${params.toString()}`);
+        if (!response.ok) throw new Error(`Erro HTTP ${response.status}: ${await response.text()}`);
+        const result = await response.json();
+        
+        const tbody = document.getElementById('movementsTableBody');
+        tbody.innerHTML = '';
+        result.movements.forEach(m => {
+          const row = document.createElement('tr');
+          row.innerHTML = `
+            <td class="px-4 py-2">${m.item_name}</td>
+            <td class="px-4 py-2">${m.installer}</td>
+            <td class="px-4 py-2">${m.client_name || m.client_id || '-'}</td>
+            <td class="px-4 py-2">${m.type === 'entry' ? 'Entrada' : 'Saída'}</td>
+            <td class="px-4 py-2">${m.quantity}</td>
+            <td class="px-4 py-2">${new Date(m.movement_date).toLocaleString('pt-BR')}</td>
+          `;
+          tbody.appendChild(row);
+        });
+        
+        // Renderizar paginação
+        renderPagination(result.pagination);
+        currentPage = page;
+      } catch (error) {
+        showModal('Erro', `Erro ao carregar movimentações filtradas: ${error.message}`, 'fas fa-exclamation-triangle text-red-600');
+      }
+    }
+
+    function renderPagination(pagination) {
+      const container = document.getElementById('paginationControls');
+      container.innerHTML = '';
+      
+      if (pagination.pages <= 1) return;
+      
+      // Botão anterior
+      if (pagination.page > 1) {
+        const prevBtn = document.createElement('button');
+        prevBtn.innerHTML = '<i class="fas fa-chevron-left"></i> Anterior';
+        prevBtn.className = 'bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700 text-sm';
+        prevBtn.onclick = () => loadFilteredMovements(pagination.page - 1);
+        container.appendChild(prevBtn);
+      }
+      
+      // Números de página
+      const startPage = Math.max(1, pagination.page - 2);
+      const endPage = Math.min(pagination.pages, pagination.page + 2);
+      
+      for (let i = startPage; i <= endPage; i++) {
+        const btn = document.createElement('button');
+        btn.textContent = i;
+        btn.className = i === pagination.page 
+          ? 'bg-blue-600 text-white px-3 py-1 rounded text-sm' 
+          : 'bg-gray-300 text-gray-800 px-3 py-1 rounded hover:bg-gray-400 text-sm';
+        btn.onclick = () => loadFilteredMovements(i);
+        container.appendChild(btn);
+      }
+      
+      // Botão próximo
+      if (pagination.page < pagination.pages) {
+        const nextBtn = document.createElement('button');
+        nextBtn.innerHTML = 'Próximo <i class="fas fa-chevron-right"></i>';
+        nextBtn.className = 'bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700 text-sm';
+        nextBtn.onclick = () => loadFilteredMovements(pagination.page + 1);
+        container.appendChild(nextBtn);
+      }
+      
+      // Info de página
+      const info = document.createElement('span');
+      info.textContent = `Página ${pagination.page} de ${pagination.pages} (${pagination.total} registros)`;
+      info.className = 'text-gray-600 text-sm';
+      container.appendChild(info);
+    }
+
+    function initMobileMenu() {
+      const mobileMenuButton = document.getElementById('mobile-menu-button');
+      const closeMenuButton = document.getElementById('close-menu-button');
+      const mobileMenu = document.getElementById('mobile-menu');
+      const menuBackdrop = document.getElementById('menu-backdrop');
+
+      function openMenu() {
+        mobileMenu.classList.add('show');
+        menuBackdrop.classList.add('show');
+        document.body.style.overflow = 'hidden';
+      }
+
+      function closeMenu() {
+        mobileMenu.classList.remove('show');
+        menuBackdrop.classList.remove('show');
+        document.body.style.overflow = '';
+      }
+
+      mobileMenuButton.addEventListener('click', openMenu);
+      closeMenuButton.addEventListener('click', closeMenu);
+      menuBackdrop.addEventListener('click', closeMenu);
+
+      // Fechar menu ao clicar em um link
+      const mobileMenuLinks = mobileMenu.getElementsByTagName('a');
+      Array.from(mobileMenuLinks).forEach(link => {
+        link.addEventListener('click', closeMenu);
+      });
+
+      // Fechar menu ao redimensionar para desktop
+      window.addEventListener('resize', () => {
+        if (window.innerWidth >= 1024) {
+          closeMenu();
+        }
+      });
+    }
+
+    window.onload = async function() {
+      const isAuthenticated = await checkAuth();
+      if (isAuthenticated) {
+        loadStock();
+        loadInstallers();
+        loadMovements();
+      }
+      initMobileMenu();
+    };
+  </script>
+</body>
+</html>

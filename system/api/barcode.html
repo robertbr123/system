@@ -1,0 +1,422 @@
+<script type="text/javascript">
+        var gk_isXlsx = false;
+        var gk_xlsxFileLookup = {};
+        var gk_fileData = {};
+        function filledCell(cell) {
+          return cell !== '' && cell != null;
+        }
+        function loadFileData(filename) {
+        if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
+            try {
+                var workbook = XLSX.read(gk_fileData[filename], { type: 'base64' });
+                var firstSheetName = workbook.SheetNames[0];
+                var worksheet = workbook.Sheets[firstSheetName];
+
+                // Convert sheet to JSON to filter blank rows
+                var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false, defval: '' });
+                // Filter out blank rows (rows where all cells are empty, null, or undefined)
+                var filteredData = jsonData.filter(row => row.some(filledCell));
+
+                // Heuristic to find the header row by ignoring rows with fewer filled cells than the next row
+                var headerRowIndex = filteredData.findIndex((row, index) =>
+                  row.filter(filledCell).length >= filteredData[index + 1]?.filter(filledCell).length
+                );
+                // Fallback
+                if (headerRowIndex === -1 || headerRowIndex > 25) {
+                  headerRowIndex = 0;
+                }
+
+                // Convert filtered JSON back to CSV
+                var csv = XLSX.utils.aoa_to_sheet(filteredData.slice(headerRowIndex)); // Create a new sheet from filtered array of arrays
+                csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
+                return csv;
+            } catch (e) {
+                console.error(e);
+                return "";
+            }
+        }
+        return gk_fileData[filename] || "";
+        }
+        </script><!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Leitor de Códigos - Sistema ERP</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/quagga@0.12.1/dist/quagga.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" integrity="sha512-iecdLmaskl7CVkqkXNQ/ZH/XLlvWZOJyj7Yy7tcenmpD1ypASozpmT/E0iPtmFIB46ZmdtAc9eNBvH0H/ZpiBw==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+  <style>
+    body {
+      font-family: 'Inter', sans-serif;
+      background: linear-gradient(to bottom, #e2e8f0, #f1f5f9);
+    }
+    .gradient-header {
+      background: linear-gradient(90deg, #1e3a8a, #3b82f6);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    }
+    .nav-link {
+      position: relative;
+      transition: color 0.3s ease;
+    }
+    .nav-link::after {
+      content: '';
+      position: absolute;
+      width: 0;
+      height: 2px;
+      bottom: -2px;
+      left: 0;
+      background-color: #ffffff;
+      transition: width 0.3s ease;
+    }
+    .nav-link:hover::after {
+      width: 100%;
+    }
+    .card {
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+      transition: transform 0.3s ease, box-shadow 0.3s ease;
+    }
+    .card:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+    }
+    .btn-primary {
+      transition: transform 0.2s, background-color 0.2s, box-shadow 0.2s, filter 0.2s;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-weight: 500;
+    }
+    .btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
+      filter: brightness(1.1);
+    }
+    .modal {
+      transition: opacity 0.3s ease-in-out, transform 0.3s ease-in-out;
+      transform: scale(0.95);
+    }
+    .modal.show {
+      transform: scale(1);
+    }
+    #scanner-container {
+      position: relative;
+      width: 100%;
+      max-width: 640px;
+      margin: 0 auto;
+      border: 2px solid #3b82f6;
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    #scanner-container video {
+      width: 100%;
+      height: auto;
+    }
+    #scanner-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      border: 20px solid rgba(0, 0, 0, 0.5);
+      box-sizing: border-box;
+      pointer-events: none;
+    }
+    @media (max-width: 640px) {
+      .container {
+        padding: 0 1rem;
+      }
+      .btn-primary {
+        font-size: 0.9rem;
+        padding: 0.75rem 1rem;
+      }
+      .card {
+        padding: 1rem;
+      }
+      .modal > div {
+        width: 95%;
+        padding: 1rem;
+      }
+      #scanner-container {
+        max-width: 100%;
+      }
+    }
+  </style>
+</head>
+<body class="min-h-screen">
+  <nav class="gradient-header p-4 shadow-md fixed w-full top-0 z-20">
+    <div class="max-w-7xl mx-auto flex justify-between items-center">
+      <h1 class="text-white text-xl sm:text-2xl font-bold flex items-center gap-2">
+        <i class="fas fa-cogs"></i> Sistema ERP
+      </h1>
+      <div class="space-x-2 sm:space-x-4 flex items-center">
+        <a href="/system/index.html" class="nav-link text-white hover:text-gray-200 font-medium text-sm sm:text-base">Cadastro</a>
+        <a href="/system/clients.html" class="nav-link text-white hover:text-gray-200 font-medium text-sm sm:text-base">Clientes</a>
+        <a href="/system/dashboard.html" class="nav-link text-white hover:text-gray-200 font-medium text-sm sm:text-base">Dashboard</a>
+        <a href="/system/plans.html" class="nav-link text-white hover:text-gray-200 font-medium text-sm sm:text-base">Planos</a>
+        <a href="/system/installers.html" class="nav-link text-white hover:text-gray-200 font-medium text-sm sm:text-base">Instaladores</a>
+        <a href="/system/stock.html" class="nav-link text-white hover:text-gray-200 font-medium text-sm sm:text-base">Estoque</a>
+        <a href="/system/barcode.html" class="nav-link text-white font-bold border-b-2 border-white">Leitor de Códigos</a>
+      </div>
+    </div>
+  </nav>
+
+  <div class="mt-20 max-w-7xl mx-auto p-4 sm:p-6 container">
+    <h2 class="text-xl sm:text-2xl font-semibold text-gray-800 mb-6 text-center flex items-center justify-center gap-2">
+      <i class="fas fa-barcode text-blue-600"></i> Leitor de Códigos de Equipamento
+    </h2>
+
+    <!-- Leitor de Códigos -->
+    <div class="card p-6 mb-6">
+      <h3 class="text-lg font-semibold text-gray-800 mb-4">Escanear Código de Equipamento</h3>
+      <div id="scanner-container" class="mb-4">
+        <video id="scanner-video" autoplay playsinline></video>
+        <div id="scanner-overlay"></div>
+      </div>
+      <div class="flex flex-col sm:flex-row gap-4">
+        <button onclick="startScanner()" class="btn-primary bg-blue-600 text-white p-3 rounded-lg hover:bg-blue-700 w-full sm:w-auto">
+          <i class="fas fa-camera"></i> Iniciar Scanner
+        </button>
+        <button onclick="stopScanner()" class="btn-primary bg-red-600 text-white p-3 rounded-lg hover:bg-red-700 w-full sm:w-auto">
+          <i class="fas fa-stop"></i> Parar Scanner
+        </button>
+      </div>
+      <div id="scannedItemInfo" class="mt-4 hidden">
+        <h4 class="text-md font-semibold text-gray-800 mb-2">Equipamento Escaneado</h4>
+        <p><strong>Nome:</strong> <span id="scannedItemName"></span></p>
+        <p><strong>Código de Barras:</strong> <span id="scannedItemBarcode"></span></p>
+        <form id="scannedMovementForm" class="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-4">
+          <input type="text" id="clientCpf" placeholder="CPF do Cliente (ex: 123.456.789-00)" class="p-3 border rounded-lg focus:outline-none" required>
+          <p id="clientName" class="text-gray-600"></p>
+          <select id="scannedInstaller" class="p-3 border rounded-lg focus:outline-none" required>
+            <option value="">Selecione o Instalador</option>
+          </select>
+          <select id="scannedMovementType" class="p-3 border rounded-lg focus:outline-none" required>
+            <option value="">Tipo de Movimentação</option>
+            <option value="entry">Entrada</option>
+            <option value="exit">Saída</option>
+          </select>
+          <input type="number" id="scannedQuantity" placeholder="Quantidade" class="p-3 border rounded-lg focus:outline-none" required min="1">
+          <input type="hidden" id="scannedItemId">
+          <button type="submit" class="btn-primary bg-blue-600 text-white p-3 rounded-lg hover:bg-blue-700 col-span-1 sm:col-span-3">
+            <i class="fas fa-exchange-alt"></i> Registrar Movimentação
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <div id="modal" class="modal fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden">
+    <div class="bg-white p-6 rounded-lg shadow-xl max-w-md w-full sm:w-3/4">
+      <h3 id="modalTitle" class="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2"></h3>
+      <p id="modalMessage" class="text-gray-600 mb-6"></p>
+      <button onclick="closeModal()" class="bg-blue-600 text-white p-2 rounded-lg hover:bg-blue-700 w-full flex items-center justify-center gap-2">
+        <i class="fas fa-check"></i> OK
+      </button>
+    </div>
+  </div>
+
+  <script>
+    let scannerActive = false;
+    let video = document.getElementById('scanner-video');
+    let stream = null;
+
+    function showModal(title, message, iconClass = 'fas fa-info-circle text-blue-600') {
+      document.getElementById('modalTitle').innerHTML = `<i class="${iconClass}"></i> ${title}`;
+      document.getElementById('modalMessage').textContent = message;
+      const modal = document.getElementById('modal');
+      modal.classList.remove('hidden');
+      modal.classList.add('show');
+      setTimeout(() => modal.classList.add('show'), 10);
+    }
+
+    function closeModal() {
+      const modal = document.getElementById('modal');
+      modal.classList.remove('show');
+      setTimeout(() => modal.classList.add('hidden'), 300);
+    }
+
+    async function loadFilters() {
+      try {
+        const response = await fetch('/system/api/installers.php');
+        if (!response.ok) throw new Error(`Erro ao carregar instaladores: ${response.statusText}`);
+        const installers = await response.json();
+        const installerSelect = document.getElementById('scannedInstaller');
+        installers.forEach(installer => {
+          const option = document.createElement('option');
+          option.value = installer.name;
+          option.textContent = installer.name;
+          installerSelect.appendChild(option);
+        });
+      } catch (error) {
+        showModal('Erro', `Erro ao carregar instaladores: ${error.message}`, 'fas fa-exclamation-triangle text-red-600');
+      }
+    }
+
+    async function startScanner() {
+      if (scannerActive) return;
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+        video.srcObject = stream;
+        scannerActive = true;
+
+        // Inicializar Quagga para códigos de barras
+        Quagga.init({
+          inputStream: {
+            name: 'Live',
+            type: 'LiveStream',
+            target: document.getElementById('scanner-video'),
+            constraints: { facingMode: 'environment' }
+          },
+          decoder: {
+            readers: ['ean_reader', 'code_128_reader', 'upc_reader']
+          }
+        }, function(err) {
+          if (err) {
+            showModal('Erro', `Erro ao iniciar scanner de código de barras: ${err.message}`, 'fas fa-exclamation-triangle text-red-600');
+            stopScanner();
+            return;
+          }
+          Quagga.start();
+        });
+
+        Quagga.onDetected(async (data) => {
+          const code = data.codeResult.code;
+          Quagga.stop();
+          stopScanner();
+          await processCode(code);
+        });
+
+        // Escanear QR codes com jsQR
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        const scanQR = () => {
+          if (!scannerActive) return;
+          canvas.width = video.videoWidth;
+          canvas.height = video.videoHeight;
+          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+          const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+          const code = jsQR(imageData.data, imageData.width, imageData.height);
+          if (code) {
+            stopScanner();
+            processCode(code.data);
+          } else {
+            requestAnimationFrame(scanQR);
+          }
+        };
+        requestAnimationFrame(scanQR);
+      } catch (error) {
+        showModal('Erro', `Erro ao acessar câmera: ${error.message}`, 'fas fa-exclamation-triangle text-red-600');
+        stopScanner();
+      }
+    }
+
+    function stopScanner() {
+      if (stream) {
+        stream.getTracks().forEach(track => track.stop());
+        video.srcObject = null;
+        stream = null;
+      }
+      if (Quagga) Quagga.stop();
+      scannerActive = false;
+    }
+
+    async function processCode(code) {
+      try {
+        const response = await fetch(`/system/api/stock.php?action=get_item_by_barcode&barcode=${encodeURIComponent(code)}`);
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(`Erro HTTP ${response.status}: ${errorText || response.statusText}`);
+        }
+        const item = await response.json();
+        if (item.error) {
+          throw new Error(item.error);
+        }
+        document.getElementById('scannedItemName').textContent = item.name;
+        document.getElementById('scannedItemBarcode').textContent = item.barcode;
+        document.getElementById('scannedItemId').value = item.id;
+        document.getElementById('scannedItemInfo').classList.remove('hidden');
+        showModal('Sucesso', `Equipamento encontrado: ${item.name} (${item.barcode})`, 'fas fa-check-circle text-green-600');
+      } catch (error) {
+        showModal('Erro', `Equipamento não encontrado: ${error.message}`, 'fas fa-exclamation-triangle text-red-600');
+      }
+    }
+
+    async function validateClientCpf(cpf) {
+      try {
+        const response = await fetch(`/system/api/stock.php?action=get_client_by_cpf&cpf=${encodeURIComponent(cpf)}`);
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(`Erro HTTP ${response.status}: ${errorText || response.statusText}`);
+        }
+        const client = await response.json();
+        if (client.error) {
+          throw new Error(client.error);
+        }
+        document.getElementById('clientName').textContent = `Cliente: ${client.name}`;
+        return true;
+      } catch (error) {
+        document.getElementById('clientName').textContent = '';
+        showModal('Erro', `Cliente não encontrado: ${error.message}`, 'fas fa-exclamation-triangle text-red-600');
+        return false;
+      }
+    }
+
+    document.getElementById('clientCpf').addEventListener('blur', async (e) => {
+      const cpf = e.target.value;
+      if (cpf) {
+        await validateClientCpf(cpf);
+      } else {
+        document.getElementById('clientName').textContent = '';
+      }
+    });
+
+    document.getElementById('scannedMovementForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const itemId = document.getElementById('scannedItemId').value;
+      const installer = document.getElementById('scannedInstaller').value;
+      const type = document.getElementById('scannedMovementType').value;
+      const quantity = document.getElementById('scannedQuantity').value;
+      const clientCpf = document.getElementById('clientCpf').value;
+
+      if (!clientCpf) {
+        showModal('Erro', 'Por favor, insira o CPF do cliente.', 'fas fa-exclamation-triangle text-red-600');
+        return;
+      }
+
+      const isClientValid = await validateClientCpf(clientCpf);
+      if (!isClientValid) return;
+
+      try {
+        const response = await fetch('/system/api/stock.php?action=add_movement', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ item_id: itemId, installer, type, quantity, client_id: clientCpf })
+        });
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(`Erro HTTP ${response.status}: ${errorText || response.statusText}`);
+        }
+        const result = await response.json();
+        if (result.error) {
+          throw new Error(result.error);
+        }
+        showModal('Sucesso', 'Movimentação registrada com sucesso!', 'fas fa-check-circle text-green-600');
+        document.getElementById('scannedMovementForm').reset();
+        document.getElementById('scannedItemInfo').classList.add('hidden');
+        document.getElementById('clientName').textContent = '';
+      } catch (error) {
+        showModal('Erro', `Erro ao registrar movimentação: ${error.message}`, 'fas fa-exclamation-triangle text-red-600');
+      }
+    });
+
+    window.onload = function() {
+      loadFilters();
+    };
+  </script>
+</body>
+</html>

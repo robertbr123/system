@@ -1,0 +1,11 @@
+nome,codigos_barras,quantidade,estoque_minimo
+Equipamento ONU,100001,10,5
+Roteador ONU,100002,15,8
+Splitter Ótico,100003,20,10
+Fusível,100004,100,50
+Conector SC/APC,100005,200,100
+Cabo Óptico 50m,100006,30,15
+Cabo Óptico 100m,100007,25,10
+Adaptador SC,100008,150,75
+POE Injector,100009,8,4
+Switch 5 portas,100010,12,6

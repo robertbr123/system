@@ -1,0 +1,861 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Rede - Integração Mikrotik</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" crossorigin="anonymous" referrerpolicy="no-referrer" />
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Poppins', sans-serif; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; }
+    .gradient-header { background: rgba(255, 255, 255, 0.1); backdrop-filter: blur(10px); border-bottom: 1px solid rgba(255,255,255,0.1); }
+    .card { background: rgba(255,255,255,0.96); border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); border: 1px solid rgba(255,255,255,0.2); }
+    .nav-link { position: relative; }
+    .nav-link::after { content: ''; position: absolute; width: 0; height: 2px; bottom: -2px; left: 0; background:#fff; transition: width .2s; }
+    .nav-link:hover::after { width: 100%; }
+    .table-container { max-height: 380px; overflow-y: auto; overflow-x: hidden; }
+    .table-responsive { overflow-x: auto; }
+    th { position: sticky; top:0; background: #1f2937; color: #fff; }
+    .mobile-menu { transform: translateX(-100%); transition: transform .3s; }
+    .mobile-menu.show { transform: translateX(0); }
+    .menu-backdrop { transition: opacity .3s; opacity: 0; pointer-events: none; }
+    .menu-backdrop.show { opacity: 1; pointer-events: auto; }
+    /* Melhorias visuais PPP Secrets */
+    .tbl-xs th, .tbl-xs td { font-size: 12px; padding: 8px; }
+    .break-any { word-break: break-word; white-space: normal; }
+  </style>
+</head>
+<body>
+  <nav class="gradient-header p-4 shadow-md fixed w-full top-0 z-30">
+    <div class="max-w-7xl mx-auto flex justify-between items-center">
+      <h1 class="text-white text-xl sm:text-2xl font-bold flex items-center gap-2">
+        <i class="fas fa-network-wired"></i> Rede
+      </h1>
+      <button id="mobile-menu-button" class="lg:hidden text-white focus:outline-none"><i class="fas fa-bars text-2xl"></i></button>
+      <div class="hidden lg:flex space-x-6 items-center">
+        <a href="/system/dashboard.html" class="nav-link text-white hover:text-gray-200 font-medium">Dashboard</a>
+        <a href="/system/index.html" class="nav-link text-white hover:text-gray-200 font-medium">Cadastro</a>
+        <a href="/system/clients.html" class="nav-link text-white hover:text-gray-200 font-medium">Clientes</a>
+        <a href="/system/stock.html" class="nav-link text-white hover:text-gray-200 font-medium">Estoque</a>
+        <a href="/system/barcode.html" class="nav-link text-white hover:text-gray-200 font-medium">Leitor</a>
+        <a href="/system/rede.html" class="nav-link text-white hover:text-gray-200 font-medium">Rede</a>
+        <a href="/system/plans.html" class="nav-link text-white hover:text-gray-200 font-medium">Planos</a>
+        <a href="/system/installers.html" class="nav-link text-white hover:text-gray-200 font-medium">Instaladores</a>
+        <button onclick="logout()" class="bg-red-600 text-white p-2 rounded-lg hover:bg-red-700 flex items-center gap-2"><i class="fas fa-sign-out-alt"></i> Sair</button>
+      </div>
+    </div>
+  </nav>
+
+  <div id="menu-backdrop" class="menu-backdrop fixed inset-0 bg-black/50 z-40 lg:hidden"></div>
+  <div id="mobile-menu" class="mobile-menu fixed left-0 top-0 h-full w-4/5 max-w-sm bg-white dark:bg-gray-800 z-50 lg:hidden overflow-y-auto">
+    <div class="p-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+      <h2 class="text-xl font-semibold text-gray-800 dark:text-white">Menu</h2>
+      <button id="close-menu-button" class="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"><i class="fas fa-times text-2xl"></i></button>
+    </div>
+    <nav class="p-4">
+      <ul class="space-y-4">
+        <li><a href="/system/dashboard.html" class="flex items-center gap-3 text-gray-700 dark:text-gray-200 hover:text-blue-600 p-2 rounded-lg hover:bg-gray-100"><i class="fas fa-chart-line w-5"></i><span>Dashboard</span></a></li>
+        <li><a href="/system/index.html" class="flex items-center gap-3 text-gray-700 dark:text-gray-200 hover:text-blue-600 p-2 rounded-lg hover:bg-gray-100"><i class="fas fa-plus-circle w-5"></i><span>Cadastro</span></a></li>
+        <li><a href="/system/clients.html" class="flex items-center gap-3 text-gray-700 dark:text-gray-200 hover:text-blue-600 p-2 rounded-lg hover:bg-gray-100"><i class="fas fa-users w-5"></i><span>Clientes</span></a></li>
+  <li><a href="/system/stock.html" class="flex items-center gap-3 text-gray-700 dark:text-gray-200 hover:text-blue-600 p-2 rounded-lg hover:bg-gray-100"><i class="fas fa-box w-5"></i><span>Estoque</span></a></li>
+        <li><a href="/system/barcode.html" class="flex items-center gap-3 text-gray-700 dark:text-gray-200 hover:text-blue-600 p-2 rounded-lg hover:bg-gray-100"><i class="fas fa-barcode w-5"></i><span>Leitor</span></a></li>
+        <li><a href="#" class="flex items-center gap-3 text-blue-700 dark:text-blue-400 p-2 rounded-lg bg-blue-50"><i class="fas fa-network-wired w-5"></i><span>Rede</span></a></li>
+        <li><a href="/system/plans.html" class="flex items-center gap-3 text-gray-700 dark:text-gray-200 hover:text-blue-600 p-2 rounded-lg hover:bg-gray-100"><i class="fas fa-list-alt w-5"></i><span>Planos</span></a></li>
+        <li><a href="/system/installers.html" class="flex items-center gap-3 text-gray-700 dark:text-gray-200 hover:text-blue-600 p-2 rounded-lg hover:bg-gray-100"><i class="fas fa-hard-hat w-5"></i><span>Instaladores</span></a></li>
+        <li><button onclick="logout()" class="flex items-center gap-3 text-white bg-red-600 hover:bg-red-700 p-2 rounded-lg mt-4 w-full"><i class="fas fa-sign-out-alt w-5"></i><span>Sair</span></button></li>
+      </ul>
+    </nav>
+  </div>
+
+  <main class="max-w-7xl mx-auto pt-24 p-4 sm:p-6">
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+  <section id="conn-form" class="card p-6 lg:col-span-1">
+        <h2 class="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2"><i class="fas fa-plug text-indigo-600"></i> Conexão MikroTik</h2>
+        <div class="space-y-3">
+          <label class="block text-sm">Host/IP
+            <input id="mt-host" class="mt-1 w-full p-2 border rounded-lg" placeholder="192.168.88.1" autocomplete="off" autocapitalize="off" spellcheck="false" />
+          </label>
+          <div class="grid grid-cols-2 gap-3">
+            <label class="block text-sm">Usuário
+              <input id="mt-user" class="mt-1 w-full p-2 border rounded-lg" placeholder="admin" autocomplete="username" autocapitalize="off" spellcheck="false" />
+            </label>
+            <label class="block text-sm">Porta
+              <input id="mt-port" type="number" class="mt-1 w-full p-2 border rounded-lg" value="8728" min="1" max="65535" inputmode="numeric" />
+            </label>
+          </div>
+          <div class="flex items-center gap-3 mt-1">
+            <label class="inline-flex items-center gap-2 text-sm">
+              <input id="mt-tls" type="checkbox" class="rounded" /> Usar TLS (API-SSL 8729)
+            </label>
+          </div>
+          <label class="block text-sm">Senha
+            <input id="mt-pass" type="password" class="mt-1 w-full p-2 border rounded-lg" autocomplete="current-password" />
+          </label>
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mt-2">
+            <div>
+              <label class="block text-sm">Nome do Equipamento
+                <input id="mt-name" class="mt-1 w-full p-2 border rounded-lg" placeholder="ex: RB CCR-01" />
+              </label>
+            </div>
+            <div class="flex flex-col justify-end">
+              <button id="btn-save-device" class="px-3 py-2 bg-gray-800 hover:bg-black text-white rounded-lg text-sm">Salvar Equipamento</button>
+              <label class="inline-flex items-center gap-2 text-xs text-gray-600 mt-2">
+                <input id="mt-save-pass" type="checkbox" class="rounded" /> Salvar senha (local)
+              </label>
+              <label class="inline-flex items-center gap-2 text-xs text-gray-600 mt-2">
+                <input id="mt-save-server" type="checkbox" class="rounded" /> Salvar no servidor (MySQL)
+              </label>
+              <label class="inline-flex items-center gap-2 text-xs text-gray-600 mt-1">
+                <input id="mt-save-server-pass" type="checkbox" class="rounded" /> Salvar senha no servidor
+              </label>
+            </div>
+            <div class="flex items-end">
+              <div class="w-full flex gap-2">
+                <select id="mt-device-list" class="p-2 border rounded-lg w-full"></select>
+                <button id="btn-load-device" class="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm">Carregar</button>
+                <button id="btn-delete-device" class="px-3 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm">Excluir</button>
+              </div>
+            </div>
+          </div>
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mt-2">
+            <div class="md:col-span-2">
+              <label class="block text-sm">Equipamentos (Servidor)
+                <select id="mt-device-list-server" class="mt-1 w-full p-2 border rounded-lg"></select>
+              </label>
+            </div>
+            <div class="flex items-end">
+              <div class="w-full flex gap-2">
+                <button id="btn-refresh-server" class="px-3 py-2 bg-gray-700 hover:bg-gray-800 text-white rounded-lg text-sm">Atualizar</button>
+                <button id="btn-load-device-server" class="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm">Carregar</button>
+                <button id="btn-delete-device-server" class="px-3 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm">Excluir</button>
+              </div>
+            </div>
+          </div>
+          <div class="flex gap-3 mt-2">
+            <button id="btn-test" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg flex items-center gap-2"><i class="fas fa-satellite-dish"></i> Testar</button>
+            <button id="btn-quick" class="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg flex items-center gap-2"><i class="fas fa-bolt"></i> Conectar e Carregar</button>
+          </div>
+          <p id="conn-status" class="text-sm mt-2 text-gray-600"></p>
+        </div>
+        <div id="identity" class="mt-5 hidden">
+          <div class="grid grid-cols-2 gap-3 text-sm">
+            <div class="p-3 rounded-lg bg-indigo-50"><div class="text-gray-500">Identidade</div><div class="font-semibold" id="id-name">-</div></div>
+            <div class="p-3 rounded-lg bg-indigo-50"><div class="text-gray-500">Versão</div><div class="font-semibold" id="id-version">-</div></div>
+            <div class="p-3 rounded-lg bg-indigo-50"><div class="text-gray-500">Uptime</div><div class="font-semibold" id="id-uptime">-</div></div>
+            <div class="p-3 rounded-lg bg-indigo-50"><div class="text-gray-500">Board</div><div class="font-semibold" id="id-board">-</div></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="lg:col-span-2 space-y-6">
+        <div class="card p-6">
+          <div class="flex items-center justify-between mb-4">
+            <h3 class="text-lg font-semibold text-gray-800"><i class="fas fa-user-plus text-indigo-600 mr-2"></i> Adicionar Cliente PPPoE</h3>
+          </div>
+          <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div>
+              <label class="text-sm text-gray-600">Usuário</label>
+              <input id="ppp-user" class="mt-1 w-full p-2 border rounded-lg" placeholder="ex: joao.silva" />
+            </div>
+            <div>
+              <label class="text-sm text-gray-600">Senha</label>
+              <input id="ppp-pass" type="password" class="mt-1 w-full p-2 border rounded-lg" placeholder="••••••" />
+            </div>
+            <div>
+              <label class="text-sm text-gray-600">Perfil</label>
+              <select id="ppp-profile" class="mt-1 w-full p-2 border rounded-lg">
+                <option value="">(Selecione)</option>
+              </select>
+            </div>
+            <div>
+              <label class="text-sm text-gray-600">Comentário (opcional)</label>
+              <input id="ppp-comment" class="mt-1 w-full p-2 border rounded-lg" placeholder="Nome do cliente / observação" />
+            </div>
+          </div>
+          <div class="mt-4">
+            <button id="btn-add-ppp" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg"><i class="fas fa-save mr-2"></i>Criar PPPoE</button>
+          </div>
+        </div>
+
+        <div class="card p-6">
+          <div class="flex items-center justify-between mb-4">
+            <h3 class="text-lg font-semibold text-gray-800"><i class="fas fa-network-wired text-blue-600 mr-2"></i> Interfaces</h3>
+            <button id="btn-interfaces" class="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm">Atualizar</button>
+          </div>
+          <div class="table-container">
+            <table class="w-full text-sm">
+              <thead>
+                <tr>
+                  <th class="p-2 text-left">Nome</th>
+                  <th class="p-2 text-left">Tipo</th>
+                  <th class="p-2 text-left">MTU</th>
+                  <th class="p-2 text-left">Tx/Rx</th>
+                  <th class="p-2 text-left">Status</th>
+                </tr>
+              </thead>
+              <tbody id="tb-interfaces"></tbody>
+            </table>
+          </div>
+        </div>
+
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div class="card p-6">
+            <div class="flex items-center justify-between mb-4">
+              <h3 class="text-lg font-semibold text-gray-800"><i class="fas fa-network-wired text-green-600 mr-2"></i> IP Addresses</h3>
+              <button id="btn-ips" class="px-3 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm">Atualizar</button>
+            </div>
+            <div class="table-container">
+              <table class="w-full text-sm">
+                <thead>
+                  <tr>
+                    <th class="p-2 text-left">Endereço</th>
+                    <th class="p-2 text-left">Interface</th>
+                    <th class="p-2 text-left">Rede</th>
+                  </tr>
+                </thead>
+                <tbody id="tb-ips"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="card p-6">
+            <div class="flex items-center justify-between mb-4">
+              <h3 class="text-lg font-semibold text-gray-800 flex items-center gap-2">
+                <i class="fas fa-user-clock text-teal-600"></i> PPP Ativos
+                <span id="ppp-count" class="ml-2 inline-block text-xs px-2 py-1 rounded-full bg-teal-100 text-teal-700">0</span>
+              </h3>
+              <div class="flex items-center gap-3">
+                <label class="inline-flex items-center gap-2 text-xs text-gray-600">
+                  <input id="auto-ppp" type="checkbox" class="rounded" /> Auto (10s)
+                </label>
+                <button id="btn-ppp" class="px-3 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-lg text-sm">Atualizar</button>
+              </div>
+            </div>
+            <div class="table-container">
+              <table class="w-full text-sm">
+                <thead>
+                  <tr>
+                    <th class="p-2 text-left">Usuário</th>
+                    <th class="p-2 text-left">Endereço</th>
+                    <th class="p-2 text-left">Chamadas</th>
+                  </tr>
+                </thead>
+                <tbody id="tb-ppp"></tbody>
+              </table>
+            </div>
+          </div>
+          
+          <div class="card p-6 lg:col-span-2">
+            <div class="flex items-center justify-between mb-4">
+              <h3 class="text-lg font-semibold text-gray-800"><i class="fas fa-user-shield text-sky-600 mr-2"></i> PPP Secrets</h3>
+              <button id="btn-ppp-secrets" class="px-3 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-lg text-sm">Atualizar</button>
+            </div>
+            <div class="table-responsive">
+              <div class="table-container">
+                <table class="w-full table-fixed tbl-xs min-w-[900px]">
+                  <thead>
+                    <tr>
+                      <th class="p-2 text-left w-48">Usuário</th>
+                      <th class="p-2 text-left w-40">Perfil</th>
+                      <th class="p-2 text-left w-28">Serviço</th>
+                      <th class="p-2 text-left w-28">Desativado</th>
+                      <th class="p-2 text-left w-[420px]">Comentário</th>
+                      <th class="p-2 text-left w-36">Ações</th>
+                    </tr>
+                  </thead>
+                  <tbody id="tb-ppp-secrets"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card p-6">
+          <div class="flex items-center justify-between mb-4">
+            <h3 class="text-lg font-semibold text-gray-800"><i class="fas fa-wifi text-orange-500 mr-2"></i> Hotspot Ativos</h3>
+            <button id="btn-hotspot" class="px-3 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg text-sm">Atualizar</button>
+          </div>
+          <div class="table-container">
+            <table class="w-full text-sm">
+              <thead>
+                <tr>
+                  <th class="p-2 text-left">Usuário</th>
+                  <th class="p-2 text-left">IP</th>
+                  <th class="p-2 text-left">MAC</th>
+                  <th class="p-2 text-left">Uptime</th>
+                </tr>
+              </thead>
+              <tbody id="tb-hotspot"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="card p-6">
+          <div class="flex items-center justify-between mb-4">
+            <h3 class="text-lg font-semibold text-gray-800"><i class="fas fa-clipboard-list text-gray-700 mr-2"></i> Logs do Equipamento</h3>
+            <div class="flex items-center gap-3">
+              <label class="inline-flex items-center gap-2 text-xs text-gray-600">
+                <input id="auto-log" type="checkbox" class="rounded" /> Auto (10s)
+              </label>
+              <button id="btn-log" class="px-3 py-2 bg-gray-700 hover:bg-gray-800 text-white rounded-lg text-sm">Atualizar</button>
+            </div>
+          </div>
+          <div class="table-container">
+            <table class="w-full text-sm">
+              <thead>
+                <tr>
+                  <th class="p-2 text-left">Hora</th>
+                  <th class="p-2 text-left">Tópicos</th>
+                  <th class="p-2 text-left">Mensagem</th>
+                </tr>
+              </thead>
+              <tbody id="tb-log"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="card p-6">
+          <div class="flex items-center justify-between mb-3">
+            <h3 class="text-lg font-semibold text-gray-800"><i class="fas fa-terminal text-purple-600 mr-2"></i> Comando (somente leitura)</h3>
+          </div>
+          <div class="flex gap-3 flex-wrap">
+            <input id="cmd" class="flex-1 min-w-[250px] p-2 border rounded-lg" placeholder="/system/resource/print" />
+            <button id="btn-run" class="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg">Executar</button>
+          </div>
+          <pre id="cmd-out" class="mt-3 p-3 bg-gray-900 text-green-200 rounded-lg text-xs overflow-auto max-h-64"></pre>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <div id="modal" class="fixed inset-0 bg-black/50 hidden items-center justify-center z-50">
+    <div class="bg-white p-6 rounded-lg shadow-xl max-w-md w-11/12">
+      <h3 id="modalTitle" class="text-lg font-semibold text-gray-800 mb-2"></h3>
+      <p id="modalMessage" class="text-gray-600 mb-4"></p>
+      <div class="flex gap-3 justify-end">
+        <button id="modalCancel" class="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-lg hidden">Cancelar</button>
+        <button id="modalOk" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg">OK</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const qs = (s)=>document.querySelector(s);
+    const qsa = (s)=>Array.from(document.querySelectorAll(s));
+
+    // Helpers
+    function setLoading(btn, isLoading, label){
+      if(!btn) return;
+      if(isLoading){
+        btn.dataset.prevLabel = btn.innerHTML;
+        btn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> ${label||'Carregando...'}`;
+        btn.disabled = true;
+        btn.classList.add('opacity-80','cursor-not-allowed');
+      }else{
+        if(btn.dataset.prevLabel){ btn.innerHTML = btn.dataset.prevLabel; delete btn.dataset.prevLabel; }
+        btn.disabled = false;
+        btn.classList.remove('opacity-80','cursor-not-allowed');
+      }
+    }
+
+    let _modalResolve = null;
+    function showModal(title, message) {
+      qs('#modalTitle').textContent = title;
+      qs('#modalMessage').textContent = message;
+      qs('#modalCancel').classList.add('hidden');
+      const m = qs('#modal');
+      m.classList.remove('hidden');
+      m.classList.add('flex');
+    }
+    function hideModal(){ const m = qs('#modal'); m.classList.add('hidden'); m.classList.remove('flex'); }
+
+    function showConfirm(title, message, confirmText='Confirmar', cancelText='Cancelar'){
+      return new Promise((resolve)=>{
+        _modalResolve = resolve;
+        qs('#modalTitle').textContent = title;
+        qs('#modalMessage').textContent = message;
+        const m = qs('#modal');
+        const ok = qs('#modalOk');
+        const cancel = qs('#modalCancel');
+        ok.textContent = confirmText;
+        cancel.textContent = cancelText;
+        cancel.classList.remove('hidden');
+        m.classList.remove('hidden'); m.classList.add('flex');
+      });
+    }
+
+    async function checkAuth(){
+      try{
+        const res = await fetch('/system/api/check_auth.php');
+        if(!res.ok){ throw new Error('Não autenticado'); }
+        const data = await res.json();
+        if(!data.authenticated){ window.location.href = '/system/login.html'; }
+      }catch(e){ window.location.href = '/system/login.html'; }
+    }
+
+    async function logout(){
+      try{ await fetch('/system/api/logout.php', {method:'POST'}); window.location.href='/system/login.html'; }catch(e){ showModal('Erro','Falha ao sair'); }
+    }
+
+    function initMobileMenu(){
+      const btn = qs('#mobile-menu-button');
+      const closeBtn = qs('#close-menu-button');
+      const menu = qs('#mobile-menu');
+      const backdrop = qs('#menu-backdrop');
+      function open(){ menu.classList.add('show'); backdrop.classList.add('show'); document.body.style.overflow='hidden'; }
+      function close(){ menu.classList.remove('show'); backdrop.classList.remove('show'); document.body.style.overflow=''; }
+      btn.addEventListener('click', open); closeBtn.addEventListener('click', close); backdrop.addEventListener('click', close);
+      qsa('#mobile-menu a').forEach(a=>a.addEventListener('click', close));
+      window.addEventListener('resize',()=>{ if(window.innerWidth>=1024) close(); });
+    }
+
+    function getConn(){
+      return {
+        host: qs('#mt-host').value.trim(),
+        username: qs('#mt-user').value.trim(),
+        password: qs('#mt-pass').value,
+        port: parseInt(qs('#mt-port').value||'8728',10) || 8728,
+        tls: !!qs('#mt-tls').checked,
+      };
+    }
+
+    // Persistência de equipamentos (localStorage)
+    function deviceKey(host, port, tls, username){ return `${host}|${port}|${tls?'1':'0'}|${username}`; }
+    function getSavedDevices(){ try{ return JSON.parse(localStorage.getItem('mt_devices')||'[]'); }catch{ return []; } }
+    function setSavedDevices(list){ localStorage.setItem('mt_devices', JSON.stringify(list)); }
+    function upsertDevice(dev){
+      const list = getSavedDevices();
+      const idx = list.findIndex(d => d.id === dev.id);
+      if (idx >= 0) list[idx] = dev; else list.push(dev);
+      setSavedDevices(list); updateDevicesUI();
+    }
+    function deleteDevice(id){ const list = getSavedDevices().filter(d=>d.id!==id); setSavedDevices(list); updateDevicesUI(); }
+    function updateDevicesUI(){
+      const list = getSavedDevices();
+      const sel = qs('#mt-device-list');
+      if (!sel) return;
+      sel.innerHTML = '';
+      list.forEach(d=>{ const o=document.createElement('option'); o.value=d.id; o.textContent=d.name||`${d.host}:${d.port}${d.tls?' (TLS)':''}`; sel.appendChild(o); });
+    }
+    async function updateServerDevicesUI(){
+      const sel = qs('#mt-device-list-server');
+      if (!sel) return;
+      sel.innerHTML = '';
+      try{
+        const rows = await serverDevices('list');
+        (rows||[]).forEach(d=>{
+          const o = document.createElement('option');
+          o.value = d.id; o.textContent = `${d.name} — ${d.host}:${d.port}${d.tls?' (TLS)':''} (${d.username})`;
+          sel.appendChild(o);
+        });
+      }catch(e){ /* silencioso */ }
+    }
+    function applyDeviceToForm(dev){
+      qs('#mt-host').value = dev.host||'';
+      qs('#mt-user').value = dev.username||'';
+      qs('#mt-port').value = dev.port||'8728';
+      qs('#mt-tls').checked = !!dev.tls;
+      qs('#mt-name').value = dev.name||'';
+      if (dev.password) qs('#mt-pass').value = dev.password; else qs('#mt-pass').value = '';
+    }
+
+    async function callApi(action, extra={}){
+      const conn = getConn();
+      if(!conn.host || !conn.username || !conn.password){ showModal('Dados incompletos','Informe host, usuário e senha.'); throw new Error('missing'); }
+      const body = JSON.stringify({ ...conn, action, ...extra });
+      const res = await fetch('/system/api/mikrotik.php', { method: 'POST', headers: {'Content-Type':'application/json'}, body });
+      if(!res.ok){ const t = await res.text(); throw new Error(t||('HTTP '+res.status)); }
+      const data = await res.json();
+      if(!data.success){ throw new Error(data.error||'Falha'); }
+      return data.data;
+    }
+
+    async function serverDevices(action, payload={}){
+      const res = await fetch('/system/api/devices.php?action='+encodeURIComponent(action), {
+        method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(payload)
+      });
+      if(!res.ok){ const t = await res.text(); throw new Error(t||('HTTP '+res.status)); }
+      const data = await res.json();
+      if(!data.success){ throw new Error(data.error||'Falha'); }
+      return data.data ?? true;
+    }
+
+    function setConnStatus(text, ok=false){ const el=qs('#conn-status'); el.textContent=text; el.className = 'text-sm mt-2 ' + (ok?'text-green-700':'text-gray-600'); }
+
+    function fillIdentity(info){
+      if(!info){ qs('#identity').classList.add('hidden'); return; }
+      qs('#id-name').textContent = info.identity || '-';
+      qs('#id-version').textContent = info.version || '-';
+      qs('#id-uptime').textContent = info.uptime || '-';
+      qs('#id-board').textContent = info.board || '-';
+      qs('#identity').classList.remove('hidden');
+    }
+
+    function renderTable(tbodySel, rows, cols){
+      const tb = qs(tbodySel); tb.innerHTML='';
+      if(!rows || !rows.length){
+        const tr = document.createElement('tr');
+        const td = document.createElement('td');
+        td.className = 'p-2 text-gray-500';
+        td.colSpan = cols.length;
+        td.textContent = 'Sem dados.';
+        tr.appendChild(td);
+        tb.appendChild(tr);
+        return;
+      }
+      rows.forEach(r=>{
+        const tr=document.createElement('tr');
+        tr.className='odd:bg-gray-50';
+        cols.forEach(c=>{
+          const td=document.createElement('td');
+          td.className='p-2';
+          td.textContent = (r[c] ?? '');
+          tr.appendChild(td);
+        });
+        tb.appendChild(tr);
+      });
+    }
+
+    function setPppCount(n){ const el = qs('#ppp-count'); if (el) el.textContent = String(n||0); }
+
+    async function loadPppProfiles(){
+      try{
+        const profiles = await callApi('ppp_profiles');
+        const sel = qs('#ppp-profile');
+        sel.innerHTML = '<option value="">(Selecione)</option>';
+        (profiles||[]).forEach(p=>{
+          const opt = document.createElement('option');
+          opt.value = p['name']||'';
+          opt.textContent = p['name']||'';
+          sel.appendChild(opt);
+        });
+      }catch(e){ /* silencioso no primeiro load */ }
+    }
+
+    function renderSecretsTable(secrets){
+      const tb = qs('#tb-ppp-secrets');
+      tb.innerHTML = '';
+      if (!secrets || !secrets.length){
+        const tr = document.createElement('tr');
+        const td = document.createElement('td');
+        td.className = 'p-2 text-gray-500';
+        td.colSpan = 6;
+        td.textContent = 'Sem dados.';
+        tr.appendChild(td);
+        tb.appendChild(tr);
+        return;
+      }
+      secrets.forEach(s=>{
+        const name = s['name']||'';
+        const profile = s['profile']||'';
+        const service = s['service']||'';
+        const disabled = s['disabled']==='true';
+        const comment = s['comment']||'';
+        const btnLabel = disabled ? 'Ativar' : 'Desativar';
+        const btnClass = disabled ? 'bg-green-600 hover:bg-green-700' : 'bg-red-600 hover:bg-red-700';
+        const tr = document.createElement('tr');
+        tr.className = 'odd:bg-gray-50';
+
+        const tdName = document.createElement('td'); tdName.className = 'p-2 break-any'; tdName.textContent = name; tr.appendChild(tdName);
+        const tdProf = document.createElement('td'); tdProf.className = 'p-2 break-any'; tdProf.textContent = profile; tr.appendChild(tdProf);
+        const tdSvc = document.createElement('td'); tdSvc.className = 'p-2'; tdSvc.textContent = service; tr.appendChild(tdSvc);
+        const tdDis = document.createElement('td'); tdDis.className = 'p-2'; tdDis.textContent = disabled ? 'Sim' : 'Não'; tr.appendChild(tdDis);
+        const tdCmt = document.createElement('td'); tdCmt.className = 'p-2 break-any'; tdCmt.textContent = comment; tr.appendChild(tdCmt);
+        const tdAct = document.createElement('td'); tdAct.className = 'p-2';
+        const div = document.createElement('div'); div.className = 'flex items-center gap-2';
+        const btn = document.createElement('button');
+        btn.title = btnLabel;
+        btn.className = `px-2 py-1 text-white text-xs rounded ${btnClass}`;
+        btn.textContent = btnLabel;
+        btn.dataset.name = name;
+        btn.dataset.next = disabled ? 'enable' : 'disable';
+        div.appendChild(btn);
+        tdAct.appendChild(div);
+        tr.appendChild(tdAct);
+
+        tb.appendChild(tr);
+      });
+      // wire buttons
+      tb.querySelectorAll('button[data-name]').forEach(btn=>{
+        btn.addEventListener('click', async (ev)=>{
+          const u = ev.currentTarget.getAttribute('data-name');
+          const next = ev.currentTarget.getAttribute('data-next');
+          const willDisable = (next === 'disable');
+          const ok = await showConfirm('Confirmação', `${willDisable? 'Desativar':'Ativar'} o usuário PPPoE "${u}"?`, willDisable?'Desativar':'Ativar');
+          if (!ok) return;
+          try{
+            await callApi('ppp_set_disabled', { name: u, disabled: willDisable });
+            await refreshPppSecrets();
+            showModal('Sucesso', `Usuário ${willDisable? 'desativado':'ativado'} com sucesso.`);
+          }catch(e){ showModal('Erro', 'Falha ao atualizar secret: '+e.message); }
+        });
+      });
+    }
+
+    async function refreshPppSecrets(){
+      try{
+        const secrets = await callApi('ppp_secrets');
+        renderSecretsTable(secrets||[]);
+      }catch(e){ showModal('Erro','PPP Secrets: '+e.message); }
+    }
+
+    // Button handlers
+    qs('#btn-test').addEventListener('click', async ()=>{
+      try{
+        setConnStatus('Testando conexão...');
+        setLoading(qs('#btn-test'), true, 'Testando...');
+        const info = await callApi('test_connection');
+        setConnStatus('Conectado ao roteador', true);
+        fillIdentity(info);
+      }catch(e){ setConnStatus('Falha: '+e.message); }
+      finally{ setLoading(qs('#btn-test'), false); }
+    });
+
+    qs('#btn-quick').addEventListener('click', async ()=>{
+      try{
+        setConnStatus('Conectando e carregando...');
+        setLoading(qs('#btn-quick'), true, 'Carregando...');
+        const batch = await callApi('batch', { actions: [
+          {name:'test_connection'},
+          {name:'interfaces'}, {name:'ip_addresses'}, {name:'ppp_active'}, {name:'hotspot_active'},
+          {name:'log', params:{limit:100}}, {name:'ppp_profiles'}, {name:'ppp_secrets'}
+        ]});
+        const info = batch['test_connection']||null;
+        fillIdentity(info);
+        const ifs = batch['interfaces']||[];
+        const ips = batch['ip_addresses']||[];
+        const ppps = batch['ppp_active']||[];
+        const hs = batch['hotspot_active']||[];
+        const logs = batch['log']||[];
+        const profiles = batch['ppp_profiles']||[];
+        const secrets = batch['ppp_secrets']||[];
+        renderTable('#tb-interfaces', ifs.map(x=>({
+          name: x['name']||'', type: x['type']||'', mtu: x['mtu']||'', rate: `${x['tx-byte']||''}/${x['rx-byte']||''}`, status: (x['running']==='true' && x['disabled']!=='true')?'Ativa':'Inativa'
+        })), ['name','type','mtu','rate','status']);
+        renderTable('#tb-ips', ips.map(x=>({ address: x['address']||'', interface: x['interface']||'', network: x['network']||'' })), ['address','interface','network']);
+        renderTable('#tb-ppp', ppps.map(x=>({ name: x['name']||'', address: x['address']||'', caller: x['caller-id']||'' })), ['name','address','caller']);
+        setPppCount(ppps.length||0);
+        renderTable('#tb-hotspot', hs.map(x=>({ user: x['user']||'', ip: x['address']||'', mac: x['mac-address']||'', uptime: x['uptime']||'' })), ['user','ip','mac','uptime']);
+        // Logs (mostrar os mais recentes primeiro, limitar a 100 linhas)
+        const logRows = (logs||[]).slice(-100).reverse().map(x=>({
+          time: x['time']||'', topics: x['topics']||'', message: x['message']||''
+        }));
+        renderTable('#tb-log', logRows, ['time','topics','message']);
+        setConnStatus('Dados carregados com sucesso', true);
+        // perfis e secrets
+        const sel = qs('#ppp-profile');
+        sel.innerHTML = '<option value="">(Selecione)</option>';
+        (profiles||[]).forEach(p=>{ const o=document.createElement('option'); o.value=p['name']||''; o.textContent=p['name']||''; sel.appendChild(o); });
+        renderSecretsTable(secrets||[]);
+      }catch(e){ setConnStatus('Falha: '+e.message); }
+      finally{ setLoading(qs('#btn-quick'), false); }
+    });
+
+    qs('#btn-interfaces').addEventListener('click', async ()=>{
+      try{
+        const data = await callApi('interfaces');
+        renderTable('#tb-interfaces', data.map(x=>({
+          name: x['name']||'', type: x['type']||'', mtu: x['mtu']||'', rate: `${x['tx-byte']||''}/${x['rx-byte']||''}`, status: (x['running']==='true' && x['disabled']!=='true')?'Ativa':'Inativa'
+        })), ['name','type','mtu','rate','status']);
+      }catch(e){ showModal('Erro','Interfaces: '+e.message); }
+    });
+
+    qs('#btn-ips').addEventListener('click', async ()=>{
+      try{
+        const data = await callApi('ip_addresses');
+        renderTable('#tb-ips', data.map(x=>({ address: x['address']||'', interface: x['interface']||'', network: x['network']||'' })), ['address','interface','network']);
+      }catch(e){ showModal('Erro','IP Addresses: '+e.message); }
+    });
+
+    async function loadPPPActive(){
+      const data = await callApi('ppp_active');
+      renderTable('#tb-ppp', data.map(x=>({ name: x['name']||'', address: x['address']||'', caller: x['caller-id']||'' })), ['name','address','caller']);
+      setPppCount(data.length||0);
+    }
+    qs('#btn-ppp').addEventListener('click', async ()=>{
+      try{ await loadPPPActive(); }catch(e){ showModal('Erro','PPP: '+e.message); }
+    });
+
+    qs('#btn-ppp-secrets').addEventListener('click', refreshPppSecrets);
+
+    // Eventos de salvar/carregar/excluir equipamento
+    qs('#btn-save-device').addEventListener('click', ()=>{
+      const conn = getConn();
+      if (!conn.host || !conn.username){ showModal('Dados incompletos', 'Informe host e usuário para salvar.'); return; }
+      const name = (qs('#mt-name').value||'').trim() || `${conn.host}:${conn.port}${conn.tls?' (TLS)':''}`;
+      const id = deviceKey(conn.host, conn.port, conn.tls, conn.username);
+      const dev = { id, name, host: conn.host, port: conn.port, tls: conn.tls, username: conn.username };
+      if (qs('#mt-save-pass').checked && conn.password){ dev.password = conn.password; }
+      upsertDevice(dev);
+      localStorage.setItem('mt_last_device', id);
+      const saveServer = qs('#mt-save-server').checked;
+      const saveServerPass = qs('#mt-save-server-pass').checked;
+      if (saveServer){
+        setLoading(qs('#btn-save-device'), true, 'Salvando...');
+        serverDevices('save', {
+          name,
+          host: conn.host,
+          port: conn.port,
+          tls: conn.tls,
+          username: conn.username,
+          password: saveServerPass ? conn.password : '',
+          savePassword: !!saveServerPass,
+        }).then(()=>{ updateServerDevicesUI(); showModal('Salvo', 'Equipamento salvo (local e servidor).'); })
+          .catch(err=>{ showModal('Aviso', 'Salvo localmente, porém falhou salvar no servidor: '+err.message); })
+          .finally(()=> setLoading(qs('#btn-save-device'), false));
+      } else {
+        showModal('Salvo', 'Equipamento salvo localmente.');
+      }
+    });
+    qs('#btn-load-device').addEventListener('click', ()=>{
+      const sel = qs('#mt-device-list'); if (!sel || !sel.value) return;
+      const id = sel.value;
+      const dev = getSavedDevices().find(d=>d.id===id); if (!dev) return;
+      applyDeviceToForm(dev);
+      localStorage.setItem('mt_last_device', id);
+    });
+    qs('#btn-delete-device').addEventListener('click', ()=>{
+      const sel = qs('#mt-device-list'); if (!sel || !sel.value) return;
+      const id = sel.value;
+      const dev = getSavedDevices().find(d=>d.id===id);
+      showConfirm('Confirmação', `Excluir equipamento "${dev?.name||id}"?`).then(ok=>{
+        if (!ok) return;
+        deleteDevice(id);
+      });
+    });
+
+    qs('#btn-add-ppp').addEventListener('click', async ()=>{
+      try{
+        const name = (qs('#ppp-user').value||'').trim();
+        const pass = (qs('#ppp-pass').value||'');
+        const profile = (qs('#ppp-profile').value||'');
+        const comment = (qs('#ppp-comment').value||'').trim();
+        if (!name || !pass) { showModal('Dados incompletos','Preencha usuário e senha.'); return; }
+        await callApi('ppp_add_secret', { name, password: pass, profile, service: 'pppoe', comment });
+        showModal('Sucesso','Cliente PPPoE criado com sucesso.');
+        qs('#ppp-pass').value='';
+        await refreshPppSecrets();
+      }catch(e){ showModal('Erro','Falha ao criar PPPoE: '+e.message); }
+    });
+
+    qs('#btn-hotspot').addEventListener('click', async ()=>{
+      try{
+        const data = await callApi('hotspot_active');
+        renderTable('#tb-hotspot', data.map(x=>({ user: x['user']||'', ip: x['address']||'', mac: x['mac-address']||'', uptime: x['uptime']||'' })), ['user','ip','mac','uptime']);
+      }catch(e){ showModal('Erro','Hotspot: '+e.message); }
+    });
+
+    // Server devices actions
+    qs('#btn-refresh-server').addEventListener('click', ()=>{ updateServerDevicesUI(); });
+    qs('#btn-load-device-server').addEventListener('click', async ()=>{
+      const sel = qs('#mt-device-list-server'); if(!sel || !sel.value) return;
+      try{
+        const dev = await serverDevices('get', {id: parseInt(sel.value,10)});
+        if (!dev) return;
+        applyDeviceToForm({
+          host: dev.host, port: dev.port, tls: !!dev.tls,
+          username: dev.username, password: dev.password, name: dev.name
+        });
+        localStorage.setItem('mt_last_device', deviceKey(dev.host, dev.port, !!dev.tls, dev.username));
+      }catch(e){ showModal('Erro', 'Falha ao carregar do servidor: '+e.message); }
+    });
+    qs('#btn-delete-device-server').addEventListener('click', async ()=>{
+      const sel = qs('#mt-device-list-server'); if(!sel || !sel.value) return;
+      const opt = sel.options[sel.selectedIndex];
+      const ok = await showConfirm('Confirmação', `Excluir do servidor: ${opt?.textContent||'seleção'}?`);
+      if (!ok) return;
+      try{
+        await serverDevices('delete', {id: parseInt(sel.value,10)});
+        await updateServerDevicesUI();
+      }catch(e){ showModal('Erro', 'Falha ao excluir do servidor: '+e.message); }
+    });
+
+    async function loadLogs(){
+      const logs = await callApi('log', {limit: 100});
+      const logRows = (logs||[]).slice(-100).reverse().map(x=>({ time: x['time']||'', topics: x['topics']||'', message: x['message']||'' }));
+      renderTable('#tb-log', logRows, ['time','topics','message']);
+    }
+    qs('#btn-log').addEventListener('click', async ()=>{
+      try{ await loadLogs(); }catch(e){ showModal('Erro','Logs: '+e.message); }
+    });
+
+    qs('#btn-run').addEventListener('click', async ()=>{
+      try{
+        const cmd = qs('#cmd').value.trim();
+        if(!cmd){ return; }
+        const out = await callApi('run', { command: cmd });
+        qs('#cmd-out').textContent = JSON.stringify(out, null, 2);
+      }catch(e){ qs('#cmd-out').textContent = 'Erro: '+e.message; }
+    });
+
+    qs('#modalOk').addEventListener('click', ()=>{
+      const cancel = qs('#modalCancel');
+      const hasCancel = !cancel.classList.contains('hidden');
+      hideModal();
+      if (_modalResolve){ _modalResolve(hasCancel ? true : undefined); _modalResolve = null; }
+    });
+    qs('#modalCancel').addEventListener('click', ()=>{
+      hideModal();
+      if (_modalResolve){ _modalResolve(false); _modalResolve = null; }
+    });
+
+    let pppIntervalId = null;
+    let logIntervalId = null;
+
+    function setupAutoRefresh(){
+      const autoPPP = qs('#auto-ppp');
+      const autoLog = qs('#auto-log');
+      if (autoPPP){
+        autoPPP.addEventListener('change', async ()=>{
+          if (autoPPP.checked){
+            // run immediately then every 10s
+            try{ await loadPPPActive(); }catch{}
+            pppIntervalId = setInterval(async ()=>{ try{ await loadPPPActive(); }catch{} }, 10000);
+          }else if(pppIntervalId){ clearInterval(pppIntervalId); pppIntervalId = null; }
+        });
+      }
+      if (autoLog){
+        autoLog.addEventListener('change', async ()=>{
+          if (autoLog.checked){
+            try{ await loadLogs(); }catch{}
+            logIntervalId = setInterval(async ()=>{ try{ await loadLogs(); }catch{} }, 10000);
+          }else if(logIntervalId){ clearInterval(logIntervalId); logIntervalId = null; }
+        });
+      }
+      window.addEventListener('beforeunload', ()=>{ if(pppIntervalId) clearInterval(pppIntervalId); if(logIntervalId) clearInterval(logIntervalId); });
+    }
+
+    window.addEventListener('load', ()=>{ 
+      checkAuth(); initMobileMenu(); loadPppProfiles(); updateDevicesUI(); updateServerDevicesUI(); setupAutoRefresh();
+      const last = localStorage.getItem('mt_last_device');
+      if (last){ const dev = getSavedDevices().find(d=>d.id===last); if (dev) applyDeviceToForm(dev); }
+    });
+
+    // Ajuste de porta ao alternar TLS
+    (function(){
+      const tls = qs('#mt-tls');
+      const port = qs('#mt-port');
+      if (tls && port){
+        tls.addEventListener('change', ()=>{
+          const p = (port.value||'').trim();
+          if (tls.checked && (!p || p === '8728')) port.value = '8729';
+          if (!tls.checked && (!p || p === '8729')) port.value = '8728';
+        });
+      }
+    })();
+
+    // Enter key on connection form triggers Testar
+    (function(){
+      const form = qs('#conn-form');
+      if(!form) return;
+      form.addEventListener('keydown', (e)=>{
+        if(e.key === 'Enter'){
+          e.preventDefault();
+          const btn = qs('#btn-test'); if(btn) btn.click();
+        }
+      });
+    })();
+  </script>
+</body>
+</html>

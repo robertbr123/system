@@ -1,0 +1,779 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Relatório de Clientes - Sistema ERP</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" integrity="sha512-iecdLmaskl7CVkqkXNQ/ZH/XLlvWZOJyj7Yy7tcenmpD1ypASozpmT/E0iPtmFIB46ZmdtAc9eNBvH0H/ZpiBw==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    body {
+      font-family: 'Poppins', sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+    }
+    .gradient-header {
+      background: rgba(255, 255, 255, 0.1);
+      backdrop-filter: blur(10px);
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    .nav-link {
+      position: relative;
+      transition: color 0.3s ease;
+    }
+    .nav-link::after {
+      content: '';
+      position: absolute;
+      width: 0;
+      height: 2px;
+      bottom: -2px;
+      left: 0;
+      background-color: #ffffff;
+      transition: width 0.3s ease;
+    }
+    .nav-link:hover::after {
+      width: 100%;
+    }
+    .card {
+      background: rgba(255, 255, 255, 0.95);
+      border-radius: 20px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+      transition: all 0.3s ease;
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      overflow: hidden;
+    }
+    .card:hover {
+      transform: translateY(-5px);
+      box-shadow: 0 15px 35px rgba(0, 0, 0, 0.2);
+    }
+    .btn-primary, .btn-print, .btn-filter {
+      transition: all 0.3s ease;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      font-weight: 600;
+      padding: 0.75rem 1.5rem;
+      font-size: 0.95rem;
+      letter-spacing: 0.5px;
+      border: none;
+      cursor: pointer;
+    }
+    .btn-primary {
+      background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+      color: white;
+    }
+    .btn-print {
+      background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+      color: white;
+    }
+    .btn-filter {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+    }
+    .btn-primary:hover, .btn-print:hover, .btn-filter:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
+    }
+    .btn-primary:active, .btn-print:active, .btn-filter:active {
+      transform: translateY(0);
+    }
+    .modal {
+      transition: all 0.3s ease-in-out;
+      transform: scale(0.95);
+      backdrop-filter: blur(8px);
+    }
+    .modal.show {
+      transform: scale(1);
+    }
+    table {
+      width: 100%;
+      border-collapse: separate;
+      border-spacing: 0;
+    }
+    th, td {
+      border: none;
+      padding: 12px;
+      text-align: left;
+      font-size: 0.9rem;
+    }
+    th {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    th:first-child {
+      border-top-left-radius: 12px;
+    }
+    th:last-child {
+      border-top-right-radius: 12px;
+    }
+    tr:nth-child(even) {
+      background-color: rgba(255, 255, 255, 0.05);
+    }
+    tr {
+      transition: all 0.3s ease;
+    }
+    tr:hover {
+      background-color: rgba(255, 255, 255, 0.1);
+      transform: scale(1.01);
+    }
+    .table-container {
+      max-height: 600px;
+      overflow-y: auto;
+    }
+    .search-input {
+      background: rgba(255, 255, 255, 0.95);
+      border: 2px solid rgba(255, 255, 255, 0.3);
+      transition: all 0.3s ease;
+    }
+    .search-input:focus {
+      outline: none;
+      border-color: #667eea;
+      box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+    }
+    .mobile-menu {
+      transform: translateX(-100%);
+      transition: transform 0.3s ease-in-out;
+    }
+    .mobile-menu.show {
+      transform: translateX(0);
+    }
+    .menu-backdrop {
+      transition: opacity 0.3s ease-in-out;
+      opacity: 0;
+      pointer-events: none;
+    }
+    .menu-backdrop.show {
+      opacity: 1;
+      pointer-events: auto;
+    }
+    .chart-container {
+      position: relative;
+      height: 250px;
+    }
+    @media print {
+      .no-print {
+        display: none;
+      }
+      .print-hidden {
+        display: none !important;
+      }
+      body {
+        background: white;
+        font-family: Arial, sans-serif;
+      }
+      .card {
+        background: white;
+        box-shadow: none;
+        border: none;
+      }
+      table {
+        font-size: 10pt;
+        width: 100%;
+        margin: 0;
+        padding: 0;
+      }
+      th, td {
+        border: 1px solid #333;
+        padding: 6px;
+        font-size: 9pt;
+      }
+      th {
+        background-color: #1e3a8a !important;
+        color: white;
+      }
+      tr:nth-child(even) {
+        background-color: #f5f5f5;
+      }
+    }
+    @media (max-width: 640px) {
+      .container {
+        padding: 0 1rem;
+      }
+      .btn-primary, .btn-print, .btn-filter {
+        font-size: 0.85rem;
+        padding: 0.65rem 1rem;
+      }
+      .card {
+        padding: 1rem;
+      }
+      .modal > div {
+        width: 95%;
+        padding: 1rem;
+      }
+      table {
+        font-size: 0.75rem;
+      }
+      th, td {
+        padding: 6px;
+      }
+      .chart-container {
+        height: 200px;
+      }
+    }
+  </style>
+</head>
+<body class="min-h-screen">
+  <!-- Navbar -->
+  <nav class="gradient-header p-4 shadow-md fixed w-full top-0 z-30 no-print">
+    <div class="max-w-7xl mx-auto flex justify-between items-center">
+      <h1 class="text-white text-xl sm:text-2xl font-bold flex items-center gap-2">
+        <i class="fas fa-globe"></i> Ondeline
+      </h1>
+
+      <!-- Menu Mobile Button -->
+      <button id="mobile-menu-button" class="lg:hidden text-white focus:outline-none">
+        <i class="fas fa-bars text-2xl"></i>
+      </button>
+
+      <!-- Desktop Menu -->
+      <div class="hidden lg:flex space-x-6 items-center">
+        <a href="/system/dashboard.html" class="nav-link text-white hover:text-gray-200 font-medium">Dashboard</a>
+        <a href="/system/index.html" class="nav-link text-white hover:text-gray-200 font-medium">Cadastro</a>
+        <a href="/system/clients.html" class="nav-link text-white hover:text-gray-200 font-medium">Clientes</a>
+        <a href="/system/stock.html" class="nav-link text-white hover:text-gray-200 font-medium">Estoque</a>
+        <a href="/system/barcode.html" class="nav-link text-white hover:text-gray-200 font-medium">Leitor</a>
+        <a href="/system/rede.html" class="nav-link text-white hover:text-gray-200 font-medium">Rede</a>
+        <a href="/system/plans.html" class="nav-link text-white hover:text-gray-200 font-medium">Planos</a>
+        <a href="/system/installers.html" class="nav-link text-white hover:text-gray-200 font-medium">Instaladores</a>
+        <button onclick="logout()" class="bg-red-600 text-white p-2 rounded-lg hover:bg-red-700 flex items-center gap-2 font-medium">
+          <i class="fas fa-sign-out-alt"></i> Sair
+        </button>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Mobile Menu Overlay -->
+  <div id="menu-backdrop" class="menu-backdrop fixed inset-0 bg-black/50 z-40 lg:hidden"></div>
+
+  <!-- Mobile Menu -->
+  <div id="mobile-menu" class="mobile-menu fixed left-0 top-0 h-full w-4/5 max-w-sm bg-white dark:bg-gray-800 z-50 lg:hidden overflow-y-auto">
+    <div class="p-4 border-b border-gray-200 dark:border-gray-700">
+      <div class="flex items-center justify-between">
+        <h2 class="text-xl font-semibold text-gray-800 dark:text-white">Menu</h2>
+        <button id="close-menu-button" class="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">
+          <i class="fas fa-times text-2xl"></i>
+        </button>
+      </div>
+    </div>
+    <nav class="p-4">
+      <ul class="space-y-4">
+        <li>
+          <a href="/system/dashboard.html" class="flex items-center gap-3 text-gray-700 dark:text-gray-200 hover:text-blue-600 dark:hover:text-blue-400 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700">
+            <i class="fas fa-chart-line w-5"></i>
+            <span>Dashboard</span>
+          </a>
+        </li>
+        <li>
+          <a href="/system/index.html" class="flex items-center gap-3 text-gray-700 dark:text-gray-200 hover:text-blue-600 dark:hover:text-blue-400 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700">
+            <i class="fas fa-plus-circle w-5"></i>
+            <span>Cadastro</span>
+          </a>
+        </li>
+        <li>
+          <a href="/system/clients.html" class="flex items-center gap-3 text-gray-700 dark:text-gray-200 hover:text-blue-600 dark:hover:text-blue-400 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700">
+            <i class="fas fa-users w-5"></i>
+            <span>Clientes</span>
+          </a>
+        </li>
+        <li>
+          <a href="/system/stock.html" class="flex items-center gap-3 text-gray-700 dark:text-gray-200 hover:text-blue-600 dark:hover:text-blue-400 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700">
+            <i class="fas fa-box w-5"></i>
+            <span>Estoque</span>
+          </a>
+        </li>
+        <li>
+          <a href="/system/barcode.html" class="flex items-center gap-3 text-gray-700 dark:text-gray-200 hover:text-blue-600 dark:hover:text-blue-400 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700">
+            <i class="fas fa-barcode w-5"></i>
+            <span>Leitor</span>
+          </a>
+        </li>
+        <li>
+          <a href="/system/rede.html" class="flex items-center gap-3 text-gray-700 dark:text-gray-200 hover:text-blue-600 dark:hover:text-blue-400 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700">
+            <i class="fas fa-network-wired w-5"></i>
+            <span>Rede</span>
+          </a>
+        </li>
+        <li>
+          <a href="/system/plans.html" class="flex items-center gap-3 text-gray-700 dark:text-gray-200 hover:text-blue-600 dark:hover:text-blue-400 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700">
+            <i class="fas fa-list-alt w-5"></i>
+            <span>Planos</span>
+          </a>
+        </li>
+        <li>
+          <a href="/system/installers.html" class="flex items-center gap-3 text-gray-700 dark:text-gray-200 hover:text-blue-600 dark:hover:text-blue-400 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700">
+            <i class="fas fa-hard-hat w-5"></i>
+            <span>Instaladores</span>
+          </a>
+        </li>
+        <li>
+          <button onclick="logout()" class="flex items-center gap-3 text-white bg-red-600 hover:bg-red-700 p-2 rounded-lg mt-4 w-full">
+            <i class="fas fa-sign-out-alt w-5"></i>
+            <span>Sair</span>
+          </button>
+        </li>
+      </ul>
+    </nav>
+  </div>
+
+  <!-- Main Content -->
+  <div class="mt-20 max-w-7xl mx-auto p-4 sm:p-6 container">
+    <!-- Header -->
+    <div class="mb-8 text-center print-hidden">
+      <div class="text-5xl mb-4 text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-purple-600">
+        <i class="fas fa-file-invoice"></i>
+      </div>
+      <h2 class="text-2xl font-bold text-white mb-2">Relatório de Clientes</h2>
+      <p class="text-gray-200">Visualize e exporte seus dados de clientes em tempo real</p>
+    </div>
+
+    <!-- Gráficos -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6 print-hidden">
+      <div class="card p-6">
+        <h3 class="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
+          <i class="fas fa-pie-chart text-blue-600"></i> Clientes por Plano
+        </h3>
+        <div class="chart-container">
+          <canvas id="chartPlan"></canvas>
+        </div>
+      </div>
+      <div class="card p-6">
+        <h3 class="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
+          <i class="fas fa-map-marked-alt text-green-600"></i> Clientes por Cidade (Top 10)
+        </h3>
+        <div class="chart-container">
+          <canvas id="chartCity"></canvas>
+        </div>
+      </div>
+      <div class="card p-6">
+        <h3 class="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
+          <i class="fas fa-user-tie text-purple-600"></i> Clientes por Instalador (Top 10)
+        </h3>
+        <div class="chart-container">
+          <canvas id="chartInstaller"></canvas>
+        </div>
+      </div>
+      <div class="card p-6">
+        <h3 class="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
+          <i class="fas fa-chart-bar text-orange-600"></i> Resumo
+        </h3>
+        <div class="space-y-4">
+          <div class="bg-gradient-to-r from-blue-100 to-blue-50 p-4 rounded-lg">
+            <p class="text-gray-600 text-sm">Total de Clientes</p>
+            <p id="totalClients" class="text-3xl font-bold text-blue-600 mt-2">0</p>
+          </div>
+          <p class="text-sm text-gray-500 text-center">Dados atualizados em tempo real</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tabela de Clientes -->
+    <div class="card p-6">
+      <div class="flex items-center justify-between mb-6 print-hidden">
+        <h2 class="text-xl font-semibold text-gray-800 flex items-center gap-2">
+          <i class="fas fa-table text-blue-600"></i> Tabela de Clientes
+        </h2>
+        <span class="text-sm text-gray-500">Filtros em tempo real</span>
+      </div>
+
+      <!-- Busca em tempo real -->
+      <div class="mb-6 print-hidden">
+        <div class="relative">
+          <input type="text" id="searchInput" placeholder="🔍 Buscar por nome, CPF, telefone, email ou cidade..." 
+                 class="search-input w-full p-3 pl-10 rounded-lg">
+          <i class="fas fa-search absolute left-3 top-3.5 text-gray-400"></i>
+        </div>
+        <p class="text-sm text-gray-600 mt-2 flex items-center gap-2">
+          <i class="fas fa-info-circle text-blue-600"></i>
+          <span id="resultCount">0</span> resultado(s) encontrado(s)
+        </p>
+      </div>
+
+      <!-- Botões de Ação -->
+      <div class="flex flex-col sm:flex-row gap-3 mb-6 print-hidden">
+        <button onclick="downloadReport()" class="btn-primary flex-1 sm:flex-none">
+          <i class="fas fa-download"></i> Baixar PDF
+        </button>
+        <button onclick="printReport()" class="btn-print flex-1 sm:flex-none">
+          <i class="fas fa-print"></i> Imprimir Tabela
+        </button>
+      </div>
+
+      <!-- Tabela -->
+      <div class="table-container overflow-x-auto rounded-lg">
+        <table id="reportTable">
+          <thead>
+            <tr>
+              <th>CPF</th>
+              <th>Serial</th>
+              <th>Nome</th>
+              <th>Endereço</th>
+              <th>Número</th>
+              <th>Compl.</th>
+              <th>Cidade</th>
+              <th>Venc.</th>
+              <th>Telefone</th>
+              <th>Nasc.</th>
+              <th>Observação</th>
+              <th>Plano</th>
+              <th>Instalador</th>
+              <th>PPPoE</th>
+              <th>Senha</th>
+            </tr>
+          </thead>
+          <tbody id="reportBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal -->
+  <div id="modal" class="modal fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden no-print z-50">
+    <div class="bg-white p-6 rounded-lg shadow-xl max-w-md w-full sm:w-3/4">
+      <h3 id="modalTitle" class="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2"></h3>
+      <p id="modalMessage" class="text-gray-600 mb-6"></p>
+      <button onclick="closeModal()" class="bg-blue-600 text-white p-2 rounded-lg hover:bg-blue-700 w-full flex items-center justify-center gap-2 font-medium">
+        <i class="fas fa-check"></i> OK
+      </button>
+    </div>
+  </div>
+
+  <script>
+    let allClients = [];
+    let charts = {};
+
+    async function checkAuth() {
+      try {
+        const response = await fetch('/system/api/check_auth.php');
+        const result = await response.json();
+        if (!response.ok || !result.authenticated) {
+          window.location.href = '/system/login.html';
+        } else {
+          loadStats();
+          loadClients();
+          initMobileMenu();
+        }
+      } catch (error) {
+        console.error('Erro ao verificar autenticação:', error);
+        window.location.href = '/system/login.html';
+      }
+    }
+
+    async function logout() {
+      try {
+        await fetch('/system/api/logout.php', { method: 'POST' });
+        window.location.href = '/system/login.html';
+      } catch (e) {
+        showModal('Erro', 'Falha ao sair', 'fas fa-exclamation-circle text-red-600');
+      }
+    }
+
+    function showModal(title, message, iconClass = 'fas fa-info-circle text-blue-600') {
+      document.getElementById('modalTitle').innerHTML = `<i class="${iconClass}"></i> ${title}`;
+      document.getElementById('modalMessage').textContent = message;
+      const modal = document.getElementById('modal');
+      modal.classList.remove('hidden');
+      modal.classList.add('show');
+      setTimeout(() => modal.classList.add('show'), 10);
+    }
+
+    function closeModal() {
+      const modal = document.getElementById('modal');
+      modal.classList.remove('show');
+      setTimeout(() => modal.classList.add('hidden'), 300);
+    }
+
+    function formatCPF(cpf) {
+      if (!cpf) return '';
+      cpf = cpf.replace(/\D/g, '');
+      return cpf.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
+    }
+
+    function formatPhone(phone) {
+      if (!phone) return '';
+      phone = phone.replace(/\D/g, '');
+      if (phone.length === 11) {
+        return phone.replace(/(\d{2})(\d{5})(\d{4})/, '($1) $2-$3');
+      } else if (phone.length === 10) {
+        return phone.replace(/(\d{2})(\d{4})(\d{4})/, '($1) $2-$3');
+      }
+      return phone;
+    }
+
+    function formatDate(date) {
+      if (!date) return '';
+      const [year, month, day] = date.split('-');
+      return `${day}/${month}/${year}`;
+    }
+
+    async function loadStats() {
+      try {
+        const response = await fetch('/system/api/report.php?action=stats');
+        if (!response.ok) throw new Error(`Erro HTTP ${response.status}`);
+        const stats = await response.json();
+
+        document.getElementById('totalClients').textContent = stats.totalClients;
+
+        // Gráfico Planos
+        const planCtx = document.getElementById('chartPlan');
+        if (planCtx) {
+          if (charts.plan) charts.plan.destroy();
+          charts.plan = new Chart(planCtx, {
+            type: 'doughnut',
+            data: {
+              labels: stats.clientsByPlan.map(p => p.name || 'Sem Plano'),
+              datasets: [{
+                data: stats.clientsByPlan.map(p => p.count),
+                backgroundColor: ['#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899'],
+              }]
+            },
+            options: {
+              responsive: true,
+              maintainAspectRatio: false,
+              plugins: { legend: { position: 'bottom' } }
+            }
+          });
+        }
+
+        // Gráfico Cidades
+        const cityCtx = document.getElementById('chartCity');
+        if (cityCtx) {
+          if (charts.city) charts.city.destroy();
+          charts.city = new Chart(cityCtx, {
+            type: 'bar',
+            data: {
+              labels: stats.clientsByCity.map(c => c.city),
+              datasets: [{
+                label: 'Clientes',
+                data: stats.clientsByCity.map(c => c.count),
+                backgroundColor: '#3b82f6'
+              }]
+            },
+            options: {
+              indexAxis: 'y',
+              responsive: true,
+              maintainAspectRatio: false,
+              plugins: { legend: { display: false } }
+            }
+          });
+        }
+
+        // Gráfico Instaladores
+        const installerCtx = document.getElementById('chartInstaller');
+        if (installerCtx) {
+          if (charts.installer) charts.installer.destroy();
+          charts.installer = new Chart(installerCtx, {
+            type: 'bar',
+            data: {
+              labels: stats.clientsByInstaller.map(i => i.installer),
+              datasets: [{
+                label: 'Clientes',
+                data: stats.clientsByInstaller.map(i => i.count),
+                backgroundColor: '#10b981'
+              }]
+            },
+            options: {
+              indexAxis: 'y',
+              responsive: true,
+              maintainAspectRatio: false,
+              plugins: { legend: { display: false } }
+            }
+          });
+        }
+      } catch (error) {
+        console.error('Erro ao carregar estatísticas:', error);
+      }
+    }
+
+    async function loadClients() {
+      try {
+        const response = await fetch('/system/api/clients.php');
+        const payload = await response.json().catch(() => null);
+        if (!response.ok) {
+          const msg = payload && payload.error ? payload.error : `Erro HTTP ${response.status}`;
+          throw new Error(msg);
+        }
+        allClients = Array.isArray(payload) ? payload : (payload && Array.isArray(payload.data) ? payload.data : []);
+        renderTable(allClients);
+      } catch (error) {
+        console.error('Erro ao carregar clientes:', error);
+        showModal('Erro', 'Erro ao carregar clientes: ' + error.message, 'fas fa-exclamation-circle text-red-600');
+      }
+    }
+
+    function searchClients(query) {
+      if (!query.trim()) {
+        renderTable(allClients);
+        document.getElementById('resultCount').textContent = allClients.length;
+        return;
+      }
+
+      const lowerQuery = query.toLowerCase();
+      const filtered = allClients.filter(client => {
+        const cpf = formatCPF(client.cpf).toLowerCase();
+        const name = (client.name || '').toLowerCase();
+        const phone = formatPhone(client.phone || '').toLowerCase();
+        const email = (client.email || '').toLowerCase();
+        const city = (client.city || '').toLowerCase();
+
+        return cpf.includes(lowerQuery) || 
+               name.includes(lowerQuery) || 
+               phone.includes(lowerQuery) || 
+               email.includes(lowerQuery) || 
+               city.includes(lowerQuery);
+      });
+
+      renderTable(filtered);
+      document.getElementById('resultCount').textContent = filtered.length;
+    }
+
+    function renderTable(list) {
+      const tbody = document.getElementById('reportBody');
+      tbody.innerHTML = '';
+      const clients = Array.isArray(list) ? list : [];
+      
+      if (clients.length === 0) {
+        const tr = document.createElement('tr');
+        tr.innerHTML = '<td colspan="15" class="text-center text-gray-600 py-8">Nenhum cliente encontrado.</td>';
+        tbody.appendChild(tr);
+      } else {
+        clients.forEach(client => {
+          const tr = document.createElement('tr');
+          tr.innerHTML = `
+            <td>${formatCPF(client.cpf)}</td>
+            <td>${client.serial || ''}</td>
+            <td>${client.name || ''}</td>
+            <td>${client.address || ''}${client.number ? ', ' + client.number : ''}${client.complement ? ' - ' + client.complement : ''}${client.city ? ', ' + client.city : ''}</td>
+            <td>${client.number || ''}</td>
+            <td>${client.complement || ''}</td>
+            <td>${client.city || ''}</td>
+            <td>${client.dueDay || ''}</td>
+            <td>${formatPhone(client.phone) || ''}</td>
+            <td>${formatDate(client.birthDate) || ''}</td>
+            <td>${client.observation || ''}</td>
+            <td>${client.plan_name || ''}</td>
+            <td>${client.installer || ''}</td>
+            <td>${client.pppoe || ''}</td>
+            <td>${client.password || ''}</td>
+          `;
+          tbody.appendChild(tr);
+        });
+      }
+    }
+
+    async function downloadReport() {
+      try {
+        const btn = event.target.closest('button');
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Gerando...';
+        
+        const response = await fetch('/system/api/report.php?action=pdf');
+        if (!response.ok) {
+          let msg = `Erro HTTP ${response.status}`;
+          try {
+            const json = await response.json();
+            msg = json && json.error ? json.error : msg;
+          } catch {}
+          throw new Error(msg);
+        }
+        
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'relatorio_clientes.pdf';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(url);
+        
+        showModal('Sucesso', 'PDF baixado com sucesso!', 'fas fa-check-circle text-green-600');
+      } catch (error) {
+        console.error('Erro ao baixar relatório:', error);
+        showModal('Erro', 'Erro ao gerar relatório: ' + error.message, 'fas fa-exclamation-circle text-red-600');
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-download"></i> Baixar PDF';
+      }
+    }
+
+    function printReport() {
+      const printWindow = window.open('', '', 'width=1200,height=600');
+      const table = document.getElementById('reportTable');
+      const title = '<h2 style="text-align: center; margin: 20px 0; font-family: Arial, sans-serif;">Relatório de Clientes</h2>';
+      const printContent = title + table.outerHTML;
+      
+      const html = '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Imprimir Relatório</title><style>* { margin: 0; padding: 0; } body { font-family: Arial, sans-serif; background: white; } h2 { text-align: center; margin: 20px 0; color: #1e3a8a; } table { width: 100%; border-collapse: collapse; margin: 20px 0; } th, td { border: 1px solid #333; padding: 8px; text-align: left; font-size: 11px; } th { background-color: #1e3a8a; color: white; font-weight: bold; } tr:nth-child(even) { background-color: #f5f5f5; } @media print { body { margin: 0; padding: 10mm; } table { page-break-inside: avoid; } tr { page-break-inside: avoid; } }</style></head><body>' + printContent + '</body></html>';
+      
+      printWindow.document.write(html);
+      printWindow.document.close();
+      setTimeout(() => {
+        printWindow.print();
+      }, 250);
+    }
+
+    function initMobileMenu() {
+      const mobileMenuButton = document.getElementById('mobile-menu-button');
+      const closeMenuButton = document.getElementById('close-menu-button');
+      const mobileMenu = document.getElementById('mobile-menu');
+      const menuBackdrop = document.getElementById('menu-backdrop');
+
+      function openMenu() {
+        mobileMenu.classList.add('show');
+        menuBackdrop.classList.add('show');
+        document.body.style.overflow = 'hidden';
+      }
+
+      function closeMenu() {
+        mobileMenu.classList.remove('show');
+        menuBackdrop.classList.remove('show');
+        document.body.style.overflow = '';
+      }
+
+      mobileMenuButton.addEventListener('click', openMenu);
+      closeMenuButton.addEventListener('click', closeMenu);
+      menuBackdrop.addEventListener('click', closeMenu);
+
+      const mobileMenuLinks = mobileMenu.getElementsByTagName('a');
+      Array.from(mobileMenuLinks).forEach(link => {
+        link.addEventListener('click', closeMenu);
+      });
+
+      window.addEventListener('resize', () => {
+        if (window.innerWidth >= 1024) {
+          closeMenu();
+        }
+      });
+    }
+
+    // Busca com debounce
+    let searchTimeout;
+    document.addEventListener('DOMContentLoaded', () => {
+      const searchInput = document.getElementById('searchInput');
+      if (searchInput) {
+        searchInput.addEventListener('input', (e) => {
+          clearTimeout(searchTimeout);
+          searchTimeout = setTimeout(() => {
+            searchClients(e.target.value);
+          }, 300);
+        });
+      }
+    });
+
+    window.onload = function() {
+      checkAuth();
+    };
+  </script>
+</body>
+</html>

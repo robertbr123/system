@@ -1,0 +1,4 @@
+nome,cpf,serial,endereço,número,complemento,cidade,telefone,data nascimento,plano,instalador,pppoe,senha,vencimento,observação
+João Silva,123.456.789-10,MAC00001,Rua Principal,100,Apto 101,Ipixuna,92988123456,1990-05-15,PLANO BASICO,Carlos,joao.silva,senha123,10,Cliente VIP
+Maria Santos,987.654.321-09,MAC00002,Avenida Central,250,Casa,Eirunepé,92987654321,1985-03-20,PLANO 100,Pedro,maria.santos,senha456,20,Renovação
+Pedro Oliveira,111.222.333-44,MAC00003,Rua Lateral,50,Apto 202,Carauari,92981112222,1992-07-10,PLANO AVANÇADO,João,pedro.oliveira,senha789,30,Novo cliente
